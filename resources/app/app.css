@@ -1,0 +1,12 @@
+/**
+ * app.css
+ * 
+ * This file contains the styles for the application UI. The styles
+ * are written in CSS and are used to style the HTML components of the
+ * application.
+ */
+
+@import 'tailwindcss';
+
+@source '../views/**/*.php';
+@source './**/*.js';
