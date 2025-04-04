@@ -76,11 +76,6 @@ We welcome contributions! Please:
 2. 🐞 Report issues [here](https://github.com/tinymvc/issues)
 3. 🛠 Submit PRs following our [contribution guidelines](https://tinymvc.github.io/contributing)
 
-## Community 🌍
-
-- [GitHub Discussions](https://github.com/tinymvc/discussions)
-- [Twitter @tinymvc](https://twitter.com/tinymvc) *(example link)*
-
 ## License 📄
 
 TinyMVC is open-source software licensed under the [MIT License](https://github.com/tinymvc/tinymvc/blob/main/LICENSE).

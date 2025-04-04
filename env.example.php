@@ -17,7 +17,7 @@ return [
     'cache_dir' => __DIR__ . '/storage/cache', // Cache files directory
     'upload_dir' => __DIR__ . '/public/uploads', // Upload directory
     'views_dir' => __DIR__ . '/resources/views', // Template directory
-    'lang_dir' => __DIR__ . '/languages', // Language files directory
+    'lang_dir' => __DIR__ . '/resources/languages', // Language files directory
 
     // URL settings
     'media_url' => '/uploads/', // Media URL
