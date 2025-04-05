@@ -1,4 +1,4 @@
-# TinyMVC Framework 🚀
+# TinyMVC Framework
 
 [![Latest Version](https://img.shields.io/github/v/release/tinymvc/tinymvc?style=flat-square)](https://github.com/tinymvc/tinymvc/releases)
 [![License](https://img.shields.io/github/license/tinymvc/tinymvc?style=flat-square)](https://github.com/tinymvc/tinymvc/blob/main/LICENSE)
@@ -8,7 +8,7 @@
 **A minimalist MVC PHP framework for modern web artisans**  
 Lightning-fast · Elegant Syntax · Developer Friendly
 
-## Features ✨
+## Key Features
 
 - **MVC Architecture** - Clean separation of concerns
 - **Lightning Fast** - Minimal overhead, maximum performance
@@ -19,7 +19,7 @@ Lightning-fast · Elegant Syntax · Developer Friendly
 - **Security First** - CSRF protection, input sanitization
 - **CLI Tools** - Built-in development server and generator commands
 
-## Installation ⚡
+## Installation
 
 Create a new project with Composer:
 
@@ -39,13 +39,13 @@ php spark serve
 
 **🌐 Production Note:** Configure your web server to point to the */public* directory.
 
-## Quick Start 🎯
+## Quick Start
 
 - Create your first route in *routes/web.php*:
     ```php
-    router()->get('/hello/{name}', function ($name) {
-        return response("Hello, $name!");
-    });
+    use App\Http\Controllers\WelcomeController;
+
+    router()->get('/hello/{name}', [WelcomeController::class, 'index']);
     ```
 - Create a controller:
     ```php
@@ -54,21 +54,20 @@ php spark serve
 
     class WelcomeController
     {
-        public function index()
+        public function index(string $name)
         {
-            return view('welcome', ['title' => 'TinyMVC Rocks!']);
+            return response("Hello, $name!");
         }
     }
     ```
 
-## Documentation 📚
+## Documentation
 
-Full documentation is available at:  
-[https://tinymvc.github.io](https://tinymvc.github.io)
+Full documentation is available at: [https://tinymvc.github.io](https://tinymvc.github.io)
 
 [![Documentation](https://img.shields.io/badge/docs-online-8A2BE2?style=for-the-badge&logo=gitbook)](https://tinymvc.github.io)
 
-## Contributing 🤝
+## Contributing
 
 We welcome contributions! Please:
 
@@ -76,6 +75,6 @@ We welcome contributions! Please:
 2. 🐞 Report issues [here](https://github.com/tinymvc/issues)
 3. 🛠 Submit PRs following our [contribution guidelines](https://tinymvc.github.io/contributing)
 
-## License 📄
+## License
 
 TinyMVC is open-source software licensed under the [MIT License](https://github.com/tinymvc/tinymvc/blob/main/LICENSE).
