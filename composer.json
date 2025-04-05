@@ -1,7 +1,7 @@
 {
     "name": "tinymvc/tinymvc",
     "type": "project",
-    "description": "Sweet and MVC Based Php Tiny Web Framework",
+    "description": "TinyMvc is a minimalist PHP framework to craft blazing-fast RESTful APIs and modern web apps.",
     "keywords": ["shahinmoyshan", "tinymvc", "tinycore", "mvc", "web framework", "php framework", "framework"],
     "license": "MIT",
     "require": {
