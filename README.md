@@ -37,7 +37,7 @@ php spark serve
 
 ```
 
-**🌐 Production Note:** Configure your web server to point to the */public* directory.
+**Production Note:** Configure your web server to point to the */public* directory.
 
 ## Quick Start
 
