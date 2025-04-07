@@ -42,6 +42,7 @@ php spark serve
 ## Quick Start
 ```php
 <?php
+
 use Spark\Http\Route;
 
 Route::get('welcome/{name}', function($name) {
