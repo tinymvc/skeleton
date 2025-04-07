@@ -20,4 +20,4 @@ $app->withCommands(function () {
 
 $app->handleCommand(); // Run the application
 
-exit(1);
+exit;

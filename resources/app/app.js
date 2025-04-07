@@ -14,7 +14,6 @@
 import './app.css';
 
 import Alpine from 'alpinejs';
-import fireline from 'fireline';
 
 import axios from 'axios';
 
@@ -22,7 +21,5 @@ window.Alpine = Alpine;
 
 window.axios = axios;
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
-
-Alpine.plugin(fireline);
 
 Alpine.start();

@@ -14,7 +14,7 @@ use Spark\Database\Model;
  */
 class User extends Model
 {
-    public static string $table = 'user';
+    public static string $table = 'users';
 
     protected array $guarded = [];
 }
