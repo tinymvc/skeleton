@@ -40,26 +40,15 @@ php spark serve
 **Production Note:** Configure your web server to point to the */public* directory.
 
 ## Quick Start
+```php
+<?php
+use Spark\Http\Route;
 
-- Create your first route in *routes/web.php*:
-    ```php
-    use App\Http\Controllers\WelcomeController;
+Route::get('welcome/{name}', function($name) {
+    return response("Welcome, $name!");
+});
 
-    router()->get('/hello/{name}', [WelcomeController::class, 'index']);
-    ```
-- Create a controller:
-    ```php
-    <?php
-    namespace App\Http\Controllers;
-
-    class WelcomeController
-    {
-        public function index(string $name)
-        {
-            return response("Hello, $name!");
-        }
-    }
-    ```
+```
 
 ## Documentation
 
@@ -73,7 +62,7 @@ We welcome contributions! Please:
 
 1. ⭐ Star the repository
 2. 🐞 Report issues [here](https://github.com/tinymvc/issues)
-3. 🛠 Submit PRs following our [contribution guidelines](https://tinymvc.github.io/contributing)
+3. 🛠 Submit PRs following our [contribution guidelines](https://tinymvc.github.io/contribution)
 
 ## License
 
