@@ -15,13 +15,13 @@ return [
     // Directory paths
     'storage_dir' => __DIR__ . '/storage', // Storage directory
     'cache_dir' => __DIR__ . '/storage/cache', // Cache files directory
-    'upload_dir' => __DIR__ . '/public/uploads', // Upload directory
+    'upload_dir' => __DIR__ . '/storage/uploads', // Upload directory
     'views_dir' => __DIR__ . '/resources/views', // Template directory
     'lang_dir' => __DIR__ . '/resources/languages', // Language files directory
 
     // URL settings
     'media_url' => '/uploads/', // Media URL
-    'asset_url' => '/assets/', // Asset URL
+    'asset_url' => '/', // Asset URL
 
     // Localization settings
     'lang' => 'en', // Default language
