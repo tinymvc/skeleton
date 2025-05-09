@@ -22,7 +22,7 @@
     },
     "scripts": {
         "post-root-package-install": [
-            "@php spark config:copy"
+            "@php -r \"file_exists('env.php') || copy('env.example.php', 'env.php');\""
         ],
         "post-create-project-cmd": [
             "@php spark key:generate"
