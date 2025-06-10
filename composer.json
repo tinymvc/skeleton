@@ -6,8 +6,7 @@
     "license": "MIT",
     "require": {
         "php": ">=8.2",
-        "tinymvc/tinycore": "^1.0",
-        "phpmailer/phpmailer": "^6.9"
+        "tinymvc/tinycore": "^1.0"
     },
     "authors": [
         {
@@ -19,6 +18,9 @@
         "psr-4": {
             "App\\": "./app"
         }
+    },
+    "suggest": {
+        "phpmailer/phpmailer": "Required for sending emails (^6.9)."
     },
     "scripts": {
         "post-root-package-install": [
