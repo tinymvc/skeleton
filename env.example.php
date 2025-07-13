@@ -21,7 +21,7 @@ return [
 
     // URL settings
     'media_url' => '/uploads/', // Media URL
-    'asset_url' => '/', // Asset URL
+    'asset_url' => '/assets/', // Asset URL
 
     // Localization settings
     'lang' => 'en', // Default language
