@@ -11,7 +11,7 @@ use Spark\Foundation\Http\Middlewares\CorsAccessControl;
  */
 class CorsControlMiddleware extends CorsAccessControl
 {
-    protected array $allowed = [
+    protected array $config = [
         /**
          * The allowed origin. An asterisk (*) is a wildcard character that will match all origins.
          *

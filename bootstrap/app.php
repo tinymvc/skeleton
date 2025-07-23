@@ -43,7 +43,7 @@ return Application::make(path: dirname(__DIR__), env: require __DIR__ . '/../env
      * @return void
      */
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->merge(require __DIR__ . '/middlewares.php');
+        $middleware->registerMany(require __DIR__ . '/middlewares.php');
         $middleware->queue(['csrf']);
     })
 

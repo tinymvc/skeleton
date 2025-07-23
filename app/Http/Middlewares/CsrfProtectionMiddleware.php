@@ -20,6 +20,7 @@ class CsrfProtectionMiddleware extends CsrfProtection
      * @var array
      */
     protected array $except = [
-        '/api/*' // Exclude all API routes from CSRF protection
+        '/api/*', // Exclude all API routes from CSRF protection
+        '/webhook/*', // Exclude all webhook routes from CSRF protection
     ];
 }

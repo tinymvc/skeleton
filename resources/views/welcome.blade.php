@@ -88,7 +88,7 @@
 <body>
     <div class="card">
         <h1>TinyMVC Framework</h1>
-        <p class="version">Version 1.0.0</p>
+        <p class="version">Core v2.x</p>
 
         <p>A minimalist MVC framework for PHP artisans.<br>
             Simple, elegant, and powerful foundation for your next project.</p>
