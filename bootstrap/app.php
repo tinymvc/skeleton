@@ -19,7 +19,7 @@ use Spark\Http\Middleware;
  * @param array $env
  *   The environment settings of the application.
  */
-return Application::make(path: dirname(__DIR__), env: require __DIR__ . '/../env.php')
+return Application::create(path: dirname(__DIR__), env: require __DIR__ . '/../env.php')
     /**
      * Register service providers in the application container.
      *

@@ -8,6 +8,6 @@
  * which is a facade for the Hyper\Router class.
  */
 
-use Spark\Http\Route;
+use Spark\Facades\Route;
 
 Route::view('/', 'welcome');
