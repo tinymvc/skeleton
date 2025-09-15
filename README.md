@@ -43,10 +43,10 @@ php spark serve
 ```php
 <?php
 
-use Spark\Http\Route;
+use Spark\Facades\Route;
 
 Route::get('welcome/{name}', function($name) {
-    return response("Welcome, $name!");
+    return "Welcome, $name!";
 });
 
 ```
