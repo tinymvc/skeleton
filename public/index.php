@@ -9,6 +9,8 @@
  * @return void
  */
 
+define('APP_START', microtime(true));
+
 // Load the Composer autoloader for the application
 require dirname(__DIR__) . '/vendor/autoload.php';
 
