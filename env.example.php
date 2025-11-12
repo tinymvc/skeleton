@@ -12,6 +12,14 @@ return [
     // Debugging settings
     'debug' => true,
 
+    // Application settings
+    'app' => [
+        'name' => 'TinyMVC', // Application name
+        'timezone' => 'UTC', // Application timezone
+    ],
+
+    'root_url' => 'http://localhost:8080', // Application URL
+
     // Directory paths
     'storage_dir' => __DIR__ . '/storage', // Storage directory
     'cache_dir' => __DIR__ . '/storage/cache', // Cache files directory

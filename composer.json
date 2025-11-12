@@ -6,7 +6,7 @@
     "license": "MIT",
     "require": {
         "php": ">=8.2",
-        "tinymvc/tinycore": "^2.0"
+        "tinymvc/tinycore": "^2.1"
     },
     "authors": [
         {
