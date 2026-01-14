@@ -13,7 +13,7 @@ $app->withContainer(function (\Spark\Container $container) {
 });
 
 $app->withCommands(function () {
-    require __DIR__ . '/routes/commands.php';
+    require __DIR__ . '/routes/console.php';
 });
 
 $app->handleCommand(); // Run the application

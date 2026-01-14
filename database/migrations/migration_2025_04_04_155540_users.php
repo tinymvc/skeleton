@@ -11,6 +11,7 @@ return new class {
             $table->string('name');
             $table->string('email')->unique()->required();
             $table->string('password', 255)->required();
+            $table->string('remember_token', 200)->nullable();
             $table->timestamps();
         });
     }

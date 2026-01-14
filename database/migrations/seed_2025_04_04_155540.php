@@ -5,16 +5,17 @@ use App\Models\User;
 return new class {
     public function up(): void
     {
-        User::create([
-            'id' => 1,
-            'name' => 'Admin',
-            'email' => 'admin@mail.com',
-            'password' => passcode('password'),
-        ]);
+        User::firstOrCreate(
+            attributes: ['email' => 'admin@mail.com'],
+            values: [
+                'name' => 'Super Admin',
+                'password' => bcrypt('password'),
+            ]
+        );
     }
 
     public function down(): void
     {
-        User::delete(['id' => [1]]);
+        User::truncate();
     }
 };

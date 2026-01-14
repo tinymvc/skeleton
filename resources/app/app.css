@@ -6,7 +6,7 @@
  * application.
  */
 
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @source '../views/**/*.php';
 @source './**/*.js';
