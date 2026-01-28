@@ -2,17 +2,16 @@
 
 namespace App\Providers;
 
-use Spark\Container;
-use Spark\Contracts\ServiceProvider;
+use Spark\Foundation\Providers\ServiceProvider;
 
 /**
  * This file contains the service provider for cli application.
  * 
  * @package App\Providers
  */
-class ConsoleServiceProvider implements ServiceProvider
+class ConsoleServiceProvider extends ServiceProvider
 {
-    public function register(Container $container): void
+    public function register(): void
     {
         // i am registering services
     }

@@ -4,12 +4,15 @@
 // Load the composer autoloader
 require __DIR__ . '/vendor/autoload.php';
 
+use Spark\Foundation\Providers\ConsoleServiceProvider as SparkConsoleServiceProvider;
+use App\Providers\ConsoleServiceProvider as AppConsoleServiceProvider;
+
 /** @var \Spark\Foundation\Application $app */
 $app = require_once __DIR__ . '/bootstrap/app.php';
 
-$app->withContainer(function (\Spark\Container $container) {
-    $container->addServiceProvider(new \Spark\Foundation\Providers\CommandsServiceProvider);
-    $container->addServiceProvider(new \App\Providers\ConsoleServiceProvider);
+$app->withApp(function (\Spark\Foundation\Application $app) {
+    $app->addServiceProvider(new SparkConsoleServiceProvider);
+    $app->addServiceProvider(new AppConsoleServiceProvider);
 });
 
 $app->withCommands(function () {

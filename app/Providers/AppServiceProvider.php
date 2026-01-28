@@ -2,8 +2,7 @@
 
 namespace App\Providers;
 
-use Spark\Container;
-use Spark\Contracts\ServiceProvider;
+use Spark\Foundation\Providers\ServiceProvider;
 
 /**
  * This file contains the service providers for the web application.
@@ -12,7 +11,7 @@ use Spark\Contracts\ServiceProvider;
  * application. The service providers in this file are only loaded
  * when the application is running in web mode.
  */
-class AppServiceProvider implements ServiceProvider
+class AppServiceProvider extends ServiceProvider
 {
     /**
      * Registers services in the application container.
@@ -21,12 +20,9 @@ class AppServiceProvider implements ServiceProvider
      * application container. It is used to add services to the container
      * that can be used by the application.
      *
-     * @param Container $container
-     *   The application container.
-     *
      * @return void
      */
-    public function register(Container $container): void
+    public function register(): void
     {
         // i am registering services
     }

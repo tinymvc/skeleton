@@ -1,6 +1,5 @@
 <?php
 
-use Spark\Container;
 use Spark\Foundation\Application;
 use Spark\Http\Middleware;
 
@@ -19,21 +18,11 @@ use Spark\Http\Middleware;
  * @param array $env
  *   The environment settings of the application.
  */
-return Application::create(path: dirname(__DIR__), env: require __DIR__ . '/../env.php')
-    /**
-     * Register service providers in the application container.
-     *
-     * @param Container $container
-     *   The application container.
-     *
-     * @return void
-     */
-    ->withContainer(function (Container $container) {
-        foreach (require __DIR__ . '/providers.php' as $provider) {
-            $container->addServiceProvider(new $provider);
-        }
-    })
-
+return Application::create(
+    path: dirname(__DIR__),
+    env: require __DIR__ . '/../env.php',
+    providers: require __DIR__ . '/providers.php'
+)
     /**
      * Register middleware in the application.
      *
@@ -42,10 +31,10 @@ return Application::create(path: dirname(__DIR__), env: require __DIR__ . '/../e
      *
      * @return void
      */
-    ->withMiddleware(function (Middleware $middleware) {
-        $middleware->registerMany(require __DIR__ . '/middlewares.php');
-        $middleware->queue(['csrf']);
-    })
+    ->withMiddleware(
+        register: require __DIR__ . '/middlewares.php',
+        queue: ['csrf']
+    )
 
     /**
      * Register routes in the application.
@@ -55,6 +44,6 @@ return Application::create(path: dirname(__DIR__), env: require __DIR__ . '/../e
      *
      * @return void
      */
-    ->withRouter(function () {
-        require __DIR__ . '/../routes/web.php'; // Load web routes
-    });
+    ->withRouting(
+        web: __DIR__ . '/../routes/web.php'
+    );
