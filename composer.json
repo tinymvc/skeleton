@@ -20,7 +20,10 @@
         }
     },
     "suggest": {
-        "phpmailer/phpmailer": "Required for sending emails (^6.9)."
+        "phpmailer/phpmailer": "Required for sending emails (^6.9).",
+        "league/commonmark": "Required to use Str::markdown() and Stringable::markdown() (^2.6).",
+        "voku/portable-ascii": "Required to use on Str::slug() with non-english strings (^2.0).,",
+        "ramsey/uuid": "Required to use Str::uuid() (^4.7)."
     },
     "scripts": {
         "post-root-package-install": [

@@ -10,14 +10,14 @@ use App\Providers\ConsoleServiceProvider as AppConsoleServiceProvider;
 /** @var \Spark\Foundation\Application $app */
 $app = require_once __DIR__ . '/bootstrap/app.php';
 
-$app->withApp(function (\Spark\Foundation\Application $app) {
+$app->withApp(then: function (\Spark\Foundation\Application $app) {
     $app->addServiceProvider(new SparkConsoleServiceProvider);
     $app->addServiceProvider(new AppConsoleServiceProvider);
 });
 
-$app->withCommands(function () {
-    require __DIR__ . '/routes/console.php';
-});
+$app->withCommands(
+    load: __DIR__ . '/routes/console.php'
+);
 
 $app->handleCommand(); // Run the application
 

@@ -1,7 +1,6 @@
 <?php
 
 use Spark\Foundation\Application;
-use Spark\Http\Middleware;
 
 /**
  * This file is the entry point of the web application.
@@ -32,7 +31,7 @@ return Application::create(
      * @return void
      */
     ->withMiddleware(
-        register: require __DIR__ . '/middlewares.php',
+        load: __DIR__ . '/middlewares.php',
         queue: ['csrf']
     )
 
