@@ -1,9 +1,9 @@
 # TinyMVC Framework
 
-[![Latest Version](https://img.shields.io/github/v/release/tinymvc/tinymvc?style=flat-square)](https://github.com/tinymvc/tinymvc/releases)
-[![License](https://img.shields.io/github/license/tinymvc/tinymvc?style=flat-square)](https://github.com/tinymvc/tinymvc/blob/main/LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/tinymvc/tinymvc?style=flat-square)](https://github.com/tinymvc/tinymvc/stargazers)
-[![Open Issues](https://img.shields.io/github/issues-raw/tinymvc/tinymvc?style=flat-square)](https://github.com/tinymvc/issues)
+[![Latest Version](https://img.shields.io/github/v/release/tinymvc/skeleton?style=flat-square)](https://github.com/tinymvc/skeleton/releases)
+[![License](https://img.shields.io/github/license/tinymvc/skeleton?style=flat-square)](https://github.com/tinymvc/skeleton/blob/main/LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/tinymvc/skeleton?style=flat-square)](https://github.com/tinymvc/skeleton/stargazers)
+[![Open Issues](https://img.shields.io/github/issues-raw/tinymvc/skeleton?style=flat-square)](https://github.com/tinymvc/issues)
 
 **A minimalist MVC PHP framework for modern web artisans**  
 Lightning-fast · Elegant Syntax · Developer Friendly
@@ -15,8 +15,10 @@ Lightning-fast · Elegant Syntax · Developer Friendly
 - **Built-in ORM** - Simple ActiveRecord implementation
 - **Routing System** - RESTful routing with parameter binding
 - **Dependency Injection** - Powerful IoC container
-- **Template Engine** - PHP-based views with layout support
-- **Security First** - CSRF protection, input sanitization
+- **Template Engine** - Blade-Like Lightweight, Super Fast Template Engine
+- **Security First** - CSRF protection, Throttling, input sanitization & validation
+- **Queue** - Minimal Queue Jobs up-to 4 workers.
+- **Cache** - Fast & Lightweight Caching System
 - **CLI Tools** - Built-in development server and generator commands
 
 ## Installation
@@ -24,7 +26,7 @@ Lightning-fast · Elegant Syntax · Developer Friendly
 Create a new project with Composer:
 
 ```bash
-composer create-project tinymvc/tinymvc myapp
+composer create-project tinymvc/skeleton myapp
 
 ```
 
@@ -67,4 +69,4 @@ We welcome contributions! Please:
 
 ## License
 
-TinyMVC is open-source software licensed under the [MIT License](https://github.com/tinymvc/tinymvc/blob/main/LICENSE).
+TinyMVC is open-source software licensed under the [MIT License](https://github.com/tinymvc/skeleton/blob/main/LICENSE).
