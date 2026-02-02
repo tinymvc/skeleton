@@ -10,7 +10,7 @@
  *   An associative array of middleware keys and their corresponding class names.
  */
 return [
+    'cors' => \App\Http\Middlewares\CorsControl::class,
     'csrf' => \App\Http\Middlewares\CsrfProtectionMiddleware::class,
-    'cors' => \App\Http\Middlewares\CorsControlMiddleware::class,
     'throttle' => \App\Http\Middlewares\ThrottleMiddleware::class,
 ];

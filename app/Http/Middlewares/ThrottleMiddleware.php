@@ -10,8 +10,6 @@ use Spark\Foundation\Http\Middlewares\ThrottleIncomingRequests as Middleware;
  * This middleware extends the base ThrottleIncomingRequests middleware
  * provided by the Spark framework to limit the rate of incoming requests
  * to the application, helping to prevent abuse and ensure fair usage.
- * 
- * @package Middlewares
  */
 class ThrottleMiddleware extends Middleware
 {

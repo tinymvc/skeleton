@@ -2,14 +2,14 @@
 
 namespace App\Http\Middlewares;
 
-use Spark\Foundation\Http\Middlewares\CorsAccessControl;
+use Spark\Foundation\Http\Middlewares\CorsAccessControl as CORS;
 
 /**
- * A middleware class for Cross-Origin Resource Sharing (CORS) control.
+ * Cross-Origin Resource Sharing (CORS) control.
  *
  * @link https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
  */
-class CorsControlMiddleware extends CorsAccessControl
+class CorsControl extends CORS
 {
     protected array $config = [
         /**
