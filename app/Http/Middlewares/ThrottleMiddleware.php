@@ -13,6 +13,5 @@ use Spark\Foundation\Http\Middlewares\ThrottleIncomingRequests as Middleware;
  */
 class ThrottleMiddleware extends Middleware
 {
-    /** @var array $config Configuration array for throttling settings. */
-    protected array $config = [];
+    // rest of the code is inherited from the ThrottleIncomingRequests class
 }

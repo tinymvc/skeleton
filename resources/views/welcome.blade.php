@@ -1,114 +1,159 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TinyMVC Framework</title>
+    <title>TinyMVC</title>
     <style>
-        :root {
-            --primary: #4F46E5;
-            --primary-hover: #4338CA;
-        }
-
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         }
 
         body {
-            background: #f8fafc;
-            height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fff;
+            color: #1a1a1a;
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-direction: column;
-            line-height: 1.6;
         }
 
-        .card {
-            background: white;
-            padding: 3rem;
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        .wrap {
             text-align: center;
-            max-width: 600px;
-            margin: 2rem;
+            padding: 2rem;
+            max-width: 520px;
+        }
+
+        .mark {
+            display: inline-block;
+            width: 48px;
+            height: 48px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .mark::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 18px;
+            height: 18px;
+            border: 2.5px solid #fff;
+            border-radius: 3px;
+            transform: translate(-50%, -50%) rotate(45deg);
         }
 
         h1 {
-            color: var(--primary);
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 0.25rem;
         }
 
-        .version {
-            color: #64748b;
+        .ver {
+            font-size: 0.8rem;
+            color: #999;
             font-weight: 500;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        p {
+            color: #666;
+            line-height: 1.7;
+            font-size: 0.95rem;
+            margin-bottom: 2.5rem;
         }
 
         .links {
             display: flex;
-            gap: 1rem;
+            gap: 10px;
             justify-content: center;
-            margin-top: 2rem;
+            margin-bottom: 2.5rem;
         }
 
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
+        .links a {
+            display: inline-block;
+            padding: 10px 22px;
+            border-radius: 8px;
             text-decoration: none;
-            font-weight: 500;
-            transition: all 0.2s;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: opacity 0.2s;
         }
 
-        .btn-primary {
-            background: var(--primary);
-            color: white;
+        .links a:hover {
+            opacity: 0.85;
         }
 
-        .btn-primary:hover {
-            background: var(--primary-hover);
+        .links .docs {
+            background: #1a1a1a;
+            color: #fff;
         }
 
-        .btn-gh {
-            background: #1F2937;
-            color: white;
+        .links .gh {
+            background: #f4f4f5;
+            color: #1a1a1a;
         }
 
-        .btn-gh:hover {
-            background: #111827;
+        .sep {
+            width: 32px;
+            height: 1px;
+            background: #e5e5e5;
+            margin: 0 auto 1.5rem;
+        }
+
+        .bottom a {
+            color: #999;
+            text-decoration: none;
+            font-size: 0.8rem;
+            margin: 0 12px;
+            transition: color 0.2s;
+        }
+
+        .bottom a:hover {
+            color: #1a1a1a;
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.6rem;
+            }
+
+            .links {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .links a {
+                width: 100%;
+                text-align: center;
+            }
         }
     </style>
 </head>
 
 <body>
-    <div class="card">
-        <h1>TinyMVC Framework</h1>
-        <p class="version">Core v2.1.x</p>
-
-        <p>A minimalist MVC framework for PHP artisans.<br>
-            Simple, elegant, and powerful foundation for your next project.</p>
-
+    <div class="wrap">
+        <div class="mark"></div>
+        <h1>TinyMVC</h1>
+        <div class="ver">&mdash;Spark v2.3.x</div>
+        <p>A lightweight MVC framework for PHP.<br>Simple tools, clean code, real projects.</p>
         <div class="links">
-            <a href="https://tinymvc.github.io" class="btn btn-primary" target="_blank">
-                Documentation
-            </a>
-            <a href="https://github.com/tinymvc/tinymvc" class="btn btn-gh" target="_blank">
-                GitHub Repository
-            </a>
+            <a href="https://tinymvc.github.io" class="docs" target="_blank">Documentation</a>
+            <a href="https://github.com/tinymvc/tinymvc" class="gh" target="_blank">GitHub</a>
         </div>
-
-        <div class="links" style="margin-top: 1.5rem;">
-            <a href="https://github.com/tinymvc/tinymvc/stargazers" class="btn btn-gh" target="_blank">
-                ⭐ Star on GitHub
-            </a>
-            <a href="https://github.com/tinymvc/tinymvc/issues" class="btn btn-gh" target="_blank">
-                🐞 Report an Issue
-            </a>
+        <div class="sep"></div>
+        <div class="bottom">
+            <a href="https://github.com/tinymvc/tinymvc/stargazers" target="_blank">Star</a>
+            <a href="https://github.com/tinymvc/tinymvc/issues" target="_blank">Issues</a>
+            <a href="https://github.com/tinymvc/tinymvc/releases" target="_blank">Releases</a>
         </div>
     </div>
 </body>

@@ -13,13 +13,15 @@ use Spark\Foundation\Application;
  * Create the application instance.
  *
  * @param string $path
- *   The directory path of the application.
- * @param array $env
- *   The environment settings of the application.
+ *   The root directory path of the application.
+ * @param string $config
+ *   Discover and load configuration files from the specified path.
+ * @param string $providers
+ *   Register service providers from the specified path.
  */
 return Application::create(
     path: dirname(__DIR__),
-    env: require __DIR__ . '/../env.php',
+    config: dirname(__DIR__) . '/config',
     providers: require __DIR__ . '/providers.php'
 )
     /**
