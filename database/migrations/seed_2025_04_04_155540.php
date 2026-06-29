@@ -9,6 +9,7 @@ return new class {
             attributes: ['email' => 'admin@mail.com'],
             values: [
                 'name' => 'Super Admin',
+                'username' => 'admin',
                 'password' => bcrypt('password'),
             ]
         );

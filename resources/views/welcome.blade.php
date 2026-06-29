@@ -143,7 +143,7 @@
     <div class="wrap">
         <div class="mark"></div>
         <h1>TinyMVC</h1>
-        <div class="ver">&mdash;Spark v2.3.x</div>
+        <div class="ver">&mdash;Spark v3.x</div>
         <p>A lightweight MVC framework for PHP.<br>Simple tools, clean code, real projects.</p>
         <div class="links">
             <a href="https://tinymvc.github.io" class="docs" target="_blank">Documentation</a>

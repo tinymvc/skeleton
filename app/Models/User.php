@@ -14,9 +14,4 @@ class User extends Model
     protected array $casts = [
         'password' => 'hashed',
     ];
-
-    public function getCreatedAtAttribute($value): string
-    {
-        return carbon($value)->toFormattedDateString();
-    }
 }
