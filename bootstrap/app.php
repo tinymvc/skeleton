@@ -21,7 +21,7 @@ use Spark\Foundation\Application;
  */
 return Application::create(
     path: dirname(__DIR__),
-    config: '/config',
+    config: 'config',
     providers: require __DIR__ . '/providers.php'
 )
     /**
