@@ -1,181 +1,220 @@
-# TinyCore Framework Context for AI Agents
+# TinyMVC Framework Guide for AI Agents
 
-This document is a working context file for Claude, Codex, or any other AI agent that needs to modify this repository. It summarizes the architecture, conventions, module responsibilities, and important framework-specific behavior of TinyCore, the core package for the TinyMVC framework.
+This file is meant to be copied into or referenced from an application that uses TinyMVC/TinyCore. It tells an AI agent how to write backend code for a TinyMVC project without assuming Laravel, Symfony, or another framework.
 
-Use this file before making changes. TinyCore is intentionally small, Laravel-like in ergonomics, and custom in implementation. Do not assume full Laravel internals exist.
+If you are an AI agent working inside a TinyMVC application, read this file before editing code.
 
-## Project Identity
+## What TinyMVC Is
 
-- Package: `tinymvc/tinycore`
-- Namespace: `Spark\\`
-- PHP requirement: `>=8.2`
-- Composer autoload:
-  - PSR-4: `Spark\\` -> `src/`
-  - Autoloaded helper files:
-    - `src/Foundation/helpers.php`
-    - `src/Support/functions.php`
-    - `src/Support/helpers.php`
-- External hard dependency:
-  - `doctrine/inflector`
-- Optional suggested extensions/libraries:
-  - `ext-pdo_sqlite` for default sqlite cache, lock, and queue drivers
-  - `ext-redis` for redis cache, lock, and queue drivers
-  - `ext-curl` for HTTP client
-  - `ext-fileinfo`, `ext-gd`
-  - `phpmailer/phpmailer`
-  - `league/commonmark`, `voku/portable-ascii`, `ramsey/uuid`
+TinyMVC is a small PHP framework powered by the TinyCore package.
 
-## Important Repository Rule
+- Core package: `tinymvc/tinycore`
+- Core namespace: `Spark\\`
+- Minimum PHP: `8.2`
+- Style: Laravel-like ergonomics, custom implementation
+- Dependency injection: `Spark\Foundation\Application` extends `Spark\Container`
+- Routing: `Spark\Routing\Router`
+- HTTP: `Spark\Http\Request`, `Spark\Http\Response`, `Spark\Http\Middleware`
+- Database: PDO wrapper, query builder, active-record-like models, schema/migrations
+- Storage utilities: sqlite or redis cache, lock, and queue
 
-`src/Support` is Laravel-derived support code. Treat it like vendor-style compatibility code.
+Do not assume Laravel classes such as `Illuminate\Http\Request`, `Illuminate\Support\Facades\Route`, `artisan`, Eloquent, or Laravel middleware internals exist. Use the `Spark\\` classes and global helpers documented here.
 
-Avoid editing `src/Support` unless the user explicitly asks for that folder. Prefer changing TinyCore-owned modules in `src/Foundation`, `src/Http`, `src/Routing`, `src/Database`, `src/Utils`, `src/Queue`, `src/View`, `src/Console`, `src/Facades`, and `src/Contracts`.
+## Framework Source Lookup Paths
 
-## High-Level Structure
+In an application project, TinyCore source is normally installed under:
 
-- `src/Foundation`: application bootstrap, service providers, console stubs, framework helpers, built-in HTTP middleware, exception types, built-in error/tracer views.
-- `src/Http`: request, response, session, auth, gate, validation/input, middleware pipeline, HTTP client.
-- `src/Routing`: router, route objects, route groups, resource routes, routing contracts/exceptions.
-- `src/Database`: PDO wrapper, query builder, active-record-like model, schema builder, migrations, casts, relations.
-- `src/Utils`: cache, lock, redis connector, mail, image, upload, paginator, carbon-like date class, Vite, tracer.
-- `src/Queue`: sqlite/redis queue, job abstraction, queue contracts/exceptions.
-- `src/View`: Blade-like renderer/compiler and attributes.
-- `src/Console`: command registry, console runner, prompt/process helpers.
-- `src/Facades`: static facades into the application container.
-- `src/Contracts`: framework interfaces.
-- `src/Exceptions`: shared exception types.
-
-## Application Bootstrap and Lifecycle
-
-Main class: `Spark\Foundation\Application`
-
-The application extends `Spark\Container` and is stored as `Application::$app`.
-
-Constructor responsibilities:
-
-1. Set `Application::$app`.
-2. Start `Tracer`.
-3. Load env with `DotEnv::bootstrap($this->path)`.
-4. Register core singleton services:
-   - `Translator`
-   - `DB`
-   - `Hash`
-   - `Blade`
-   - `Queue`
-   - `Router`
-   - `Middleware`
-   - `Events`
-5. In web mode (`is_web()`), also register:
-   - `Session`
-   - `InputErrors`
-   - `Request`
-   - `Response`
-   - `Gate`
-   - `Auth`
-   - `Vite`
-
-Common bootstrap API:
-
-```php
-Application::create($rootPath, config: 'config', providers: [...])
-    ->withApp(...)
-    ->withMiddleware(...)
-    ->withRouting(...)
-    ->withQueue(...)
-    ->run();
+```text
+./vendor/tinymvc/tinycore/
 ```
 
-`withApp()` accepts:
+If an AI needs exact behavior, it should inspect these files as read-only reference. Do not edit vendor/framework files inside an application unless the user explicitly asks to patch the framework itself.
 
-- `config` as array: merged directly into app config.
-- `config` as string: discovers PHP config files under the folder and caches merged config under `bootstrap/cache/{sanitized_folder}.php`.
-- `providers`: service provider classes or objects with `register()`.
-- `middlewares`: map of aliases to middleware class/callable.
+Core bootstrap and container:
 
-`withRouting()`:
+- Application lifecycle: `./vendor/tinymvc/tinycore/src/Foundation/Application.php`
+- Service container and dependency injection: `./vendor/tinymvc/tinycore/src/Container.php`
+- Service provider base class: `./vendor/tinymvc/tinycore/src/Foundation/Providers/ServiceProvider.php`
+- Core console provider: `./vendor/tinymvc/tinycore/src/Foundation/Providers/ConsoleServiceProvider.php`
+- Environment and config cache: `./vendor/tinymvc/tinycore/src/DotEnv.php`
+- Global helpers: `./vendor/tinymvc/tinycore/src/Foundation/helpers.php`
 
-- Loads API routes inside a group:
-  - prefix: `api`
-  - middleware: `cors`
-  - without middleware: `csrf`
-- Loads webhook routes inside a group:
-  - prefix: `webhook`
-  - without middleware: `csrf`
-- Loads web and command route files directly.
+Routing and request lifecycle:
 
-`run()` lifecycle:
+- Router: `./vendor/tinymvc/tinycore/src/Routing/Router.php`
+- Route builder: `./vendor/tinymvc/tinycore/src/Routing/Route.php`
+- Route groups: `./vendor/tinymvc/tinycore/src/Routing/RouteGroup.php`
+- Resource routes: `./vendor/tinymvc/tinycore/src/Routing/RouteResource.php`
+- Route facade: `./vendor/tinymvc/tinycore/src/Facades/Route.php`
+- Request: `./vendor/tinymvc/tinycore/src/Http/Request.php`
+- Response: `./vendor/tinymvc/tinycore/src/Http/Response.php`
+- Middleware pipeline: `./vendor/tinymvc/tinycore/src/Http/Middleware.php`
 
-1. Dispatch `app:booting` in debug mode.
-2. Set timezone from `config('app.timezone', 'UTC')`.
-3. Boot service providers.
-4. Dispatch `app:booted` in debug mode.
-5. Resolve `Router` and `Request`.
-6. Dispatch request through router.
-7. Send returned `Response`.
-8. Dispatch `app:terminated` in debug mode.
-9. Map framework exceptions to `abort()` responses:
-   - route/item/not found -> 404
-   - authorization -> 403
-   - invalid CSRF -> 419
-   - too many requests -> 429
-10. Custom exception handlers registered through `withExceptions()` may return a `Response`.
-11. Unhandled exceptions are passed to `Tracer`.
+Built-in middleware:
 
-## Service Container
+- CORS base middleware: `./vendor/tinymvc/tinycore/src/Foundation/Http/Middlewares/CorsAccessControl.php`
+- CSRF base middleware: `./vendor/tinymvc/tinycore/src/Foundation/Http/Middlewares/CsrfProtection.php`
+- Throttle base middleware: `./vendor/tinymvc/tinycore/src/Foundation/Http/Middlewares/ThrottleIncomingRequests.php`
+- Middleware contract: `./vendor/tinymvc/tinycore/src/Contracts/Http/MiddlewareInterface.php`
 
-Main class: `Spark\Container`
+Validation, auth, and session:
 
-Important methods:
+- Form request base class: `./vendor/tinymvc/tinycore/src/Foundation/Http/FormRequest.php`
+- Validator: `./vendor/tinymvc/tinycore/src/Http/Validator.php`
+- Validated input wrapper: `./vendor/tinymvc/tinycore/src/Http/Input.php`
+- Input errors: `./vendor/tinymvc/tinycore/src/Http/InputErrors.php`
+- Auth manager: `./vendor/tinymvc/tinycore/src/Http/Auth.php`
+- Gate/authorization: `./vendor/tinymvc/tinycore/src/Http/Gate.php`
+- Session: `./vendor/tinymvc/tinycore/src/Http/Session.php`
 
-- `bind($abstract, $concrete = null)`
-- `singleton($abstract, $concrete = null)`
-- `instance($abstract, $instance)`
-- `alias($alias, $abstract)`
-- `get($abstract)`
-- `make($abstract, $parameters = [])`
-- `call($callableOrClassMethod, $parameters = [])`
-- `when($concrete, $needs, $give)` for contextual binding
-- `addServiceProvider($provider)`
-- `bootServiceProviders()`
-- `forget()`, `reset()`, `flush()`
+Database, ORM, and migrations:
 
-`Application` inherits this container. Prefer resolving dependencies through `app()`, `get()`, constructor injection, or `Application::$app->make()`.
+- DB/PDO wrapper: `./vendor/tinymvc/tinycore/src/Database/DB.php`
+- Query builder: `./vendor/tinymvc/tinycore/src/Database/QueryBuilder.php`
+- Model base class: `./vendor/tinymvc/tinycore/src/Database/Model.php`
+- Model casts trait: `./vendor/tinymvc/tinycore/src/Database/Casts/Castable.php`
+- Attribute cast helper: `./vendor/tinymvc/tinycore/src/Database/Casts/Attribute.php`
+- Migration runner: `./vendor/tinymvc/tinycore/src/Database/Migration.php`
+- Schema facade/class: `./vendor/tinymvc/tinycore/src/Database/Schema/Schema.php`
+- Blueprint: `./vendor/tinymvc/tinycore/src/Database/Schema/Blueprint.php`
+- Column definitions: `./vendor/tinymvc/tinycore/src/Database/Schema/Column.php`
+- Schema grammar: `./vendor/tinymvc/tinycore/src/Database/Schema/Grammar.php`
+- Relations: `./vendor/tinymvc/tinycore/src/Database/Relation/`
 
-## Environment and Config
+Cache, lock, queue, and redis:
 
-Main class: `Spark\DotEnv`
+- Cache: `./vendor/tinymvc/tinycore/src/Utils/Cache.php`
+- Lock: `./vendor/tinymvc/tinycore/src/Utils/Lock.php`
+- Queue: `./vendor/tinymvc/tinycore/src/Queue/Queue.php`
+- Job wrapper: `./vendor/tinymvc/tinycore/src/Queue/Job.php`
+- Job contracts: `./vendor/tinymvc/tinycore/src/Queue/Contracts/`
+- Redis connector: `./vendor/tinymvc/tinycore/src/Utils/RedisConnector.php`
 
-Env cache:
+Views, console, events, facades, utilities:
 
-- `DotEnv::bootstrap($basePath)` loads `.env` and caches to `bootstrap/cache/env.php`.
-- `.env` parsing supports comments, quotes, booleans, null, empty, integers, floats, `export KEY=VALUE`, inline comments, and `${VAR}` interpolation.
-- `DotEnv::isFresh()` compares env cache mtime with `.env` mtime.
+- Blade renderer: `./vendor/tinymvc/tinycore/src/View/Blade.php`
+- Blade compiler: `./vendor/tinymvc/tinycore/src/View/BladeCompiler.php`
+- View attributes: `./vendor/tinymvc/tinycore/src/View/Attributes.php`
+- Console runner: `./vendor/tinymvc/tinycore/src/Console/Console.php`
+- Command registry: `./vendor/tinymvc/tinycore/src/Console/Commands.php`
+- Console stubs: `./vendor/tinymvc/tinycore/src/Foundation/Console/stubs/`
+- Event dispatcher: `./vendor/tinymvc/tinycore/src/Events.php`
+- Facade base class: `./vendor/tinymvc/tinycore/src/Facades/Facade.php`
+- All facades: `./vendor/tinymvc/tinycore/src/Facades/`
+- Carbon-like date utility: `./vendor/tinymvc/tinycore/src/Utils/Carbon.php`
+- Mail utility: `./vendor/tinymvc/tinycore/src/Utils/Mail.php`
+- HTTP client: `./vendor/tinymvc/tinycore/src/Http/Client/`
+- Upload/file/image utilities: `./vendor/tinymvc/tinycore/src/Utils/Uploader.php`, `./vendor/tinymvc/tinycore/src/Utils/FileManager.php`, `./vendor/tinymvc/tinycore/src/Utils/Image.php`
+- Tracer/debugging: `./vendor/tinymvc/tinycore/src/Utils/Tracer.php`
+- Vite integration: `./vendor/tinymvc/tinycore/src/Utils/Vite.php`
 
-Config discovery:
+## How To Use This File
 
-- `DotEnv::discoverConfig($folder, $cache, $env)` scans PHP config files recursively and writes a compiled payload:
-  - `config`: merged config array
-  - `files`: config file mtimes
-  - `env`: `.env` path and mtime signature
-  - `generated_at`
-- If a config PHP file changes, is added, removed, or `.env` changes, config cache is stale and rebuilt.
-- Config keys are derived from relative config file paths:
-  - `config/app.php` -> `app`
-  - `config/cache.php` -> `cache`
-  - nested files become dot-like keys.
+When implementing a feature in a TinyMVC app:
 
-Use:
+1. Inspect the current app structure first.
+2. Look for `bootstrap/app.php`, `routes/*.php`, `config/*.php`, `app/`, `database/`, `resources/views/`, and `storage/`.
+3. Follow existing namespaces and directory conventions in that app.
+4. Use `Spark\\` classes, TinyMVC helpers, and the app's own base classes.
+5. Do not edit `vendor/tinymvc/tinycore` or framework source unless the user explicitly asks to modify the framework itself.
+6. Do not create Laravel-specific files or syntax unless this app already provides compatibility.
 
-```php
-config('app.debug');
-config(['app.debug' => true]);
-env('APP_KEY', 'fallback');
+## Typical Application Layout
+
+Actual apps may vary, but common TinyMVC app layout is:
+
+```text
+app/
+  Http/
+    Controllers/
+    Middlewares/
+    Requests/
+  Models/
+  Providers/
+  Jobs/
+  Services/
+bootstrap/
+  app.php
+  middlewares.php
+  providers.php
+config/
+  app.php
+  cache.php
+  database.php
+  mail.php
+  queue.php
+database/
+  migrations/
+public/
+  index.php
+resources/
+  views/
+routes/
+  web.php
+  api.php
+  webhook.php
+  console.php
+storage/
+  cache/
+  logs/
+  queue/
+  temp/
+  uploads/
 ```
 
-Recommended config shapes:
+Always verify the actual project before creating files.
+
+## Core Bootstrap
+
+TinyMVC apps usually bootstrap the framework through `Spark\Foundation\Application`.
+
+Example shape:
 
 ```php
-// config/database.php
+<?php
+
+use Spark\Foundation\Application;
+
+return Application::create(
+    path: dirname(__DIR__),
+    config: 'config',
+    providers: require __DIR__ . '/providers.php',
+)
+    ->withMiddleware(
+        load: __DIR__ . '/middlewares.php',
+        queue: ['csrf']
+    )
+    ->withRouting(
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        webhook: __DIR__ . '/../routes/webhook.php'
+    );
+```
+
+Important lifecycle:
+
+1. `Application` sets `Application::$app`.
+2. `.env` is loaded and cached.
+3. Core services are registered.
+4. Config is discovered and cached.
+5. Providers register and boot.
+6. Router dispatches the current `Request`.
+7. Middleware wraps the matched route.
+8. Route callback/controller returns a value.
+9. Router converts it to `Response`.
+10. `Response::send()` sends headers and body.
+
+## Configuration
+
+Config files return PHP arrays. Use `config('key.path')` and `env('KEY', $default)`.
+
+### Database Config
+
+Expected shape:
+
+```php
+<?php
+
 return [
     'driver' => env('DB_CONNECTION', 'sqlite'),
     'connections' => [
@@ -193,8 +232,13 @@ return [
 ];
 ```
 
+### Cache and Lock Config
+
+Cache and lock both use `config('cache')`.
+
 ```php
-// config/cache.php
+<?php
+
 return [
     'driver' => env('CACHE_DRIVER', 'sqlite'),
     'connections' => [
@@ -215,8 +259,13 @@ return [
 ];
 ```
 
+### Queue Config
+
+Queue uses `config('queue')`.
+
 ```php
-// config/queue.php
+<?php
+
 return [
     'driver' => env('QUEUE_DRIVER', 'sqlite'),
     'connections' => [
@@ -237,404 +286,604 @@ return [
 ];
 ```
 
-Do not reintroduce old path helpers such as `cache_dir()` for cache/lock/queue storage. Use config.
+## Global Helpers
 
-## HTTP Request
+Common helpers:
 
-Main class: `Spark\Http\Request`
+```php
+app();                 // application container
+app(Foo::class);       // resolve from container
+get(Foo::class);       // resolve from container
+config('app.debug');
+config(['app.debug' => true]);
+env('APP_KEY');
 
-Constructor parses from PHP globals:
+request();
+request('email');
+response('OK', 200);
+json(['ok' => true]);
+redirect('/login');
+back();
 
-- method from `$_SERVER['REQUEST_METHOD']`
-- path from `REQUEST_URI`
-- root URL and full URL from host/protocol server values
-- headers from `HTTP_*`
-- server params
-- files
-- query params
-- post params plus JSON body for `POST`, `PUT`, `PATCH`, `DELETE` when `$_POST` is empty
+router();
+route_url('users.show', ['id' => 5]);
+route('users.show', ['id' => 5]); // returns Spark\Url
 
-Method override:
+view('users.index', ['users' => $users]);
+fireline('emails.welcome', ['user' => $user]);
 
-- Only for original `POST`
-- Reads `HTTP_X_HTTP_METHOD_OVERRIDE` or `_method`
-- Allows `PUT`, `PATCH`, `DELETE`
+auth();
+user();
+gate();
+authorize('update-post', $post);
 
-Useful request API:
+db();
+query('users');
+cache('default');
+lock('key');
 
-- `getMethod()`, `isGet()`, `isPost()`, `isPut()`, `isDelete()`, `isMethod()`
-- `isPostBack()` means `POST`, `PUT`, `PATCH`, or `DELETE`
-- `getPath()`, `getUrl()`, `getUri()`, `getRootUrl()`
-- `query()`, `post()`, `file()`, `server()`, `header()`
-- `all()`, `only()`, `except()`, `input()`, `safe()`
-- `route()`, `mergeRouteParams()`, `getRouteParams()`
-- `expectsJson()`, `isAjax()`, `isFirelineRequest()`
-- validation: `validate()`, `validated()`, `errors()`
-- auth/session helpers: `auth()`, `user()`, `isAuthenticated()`, `session()`
+storage_dir('cache');
+root_dir('routes/web.php');
+dir_path($path);
 
-`parseRootUrl()` validates host using a conservative host regex to prevent header injection.
+now();
+carbon('2026-01-01');
+abort(404, 'Not found');
+```
 
-## HTTP Response
-
-Main class: `Spark\Http\Response`
-
-Important API:
-
-- `new Response($content = '', $statusCode = 200, $headers = [])`
-- `setContent()`, `write()`
-- `setStatusCode()`
-- `setHeader()`, `withHeaders()`
-- `json()`, `withJson()`
-- `redirect()`, `routeRedirect()`, `back()`
-- `with()`, `withErrors()`, `withInput()`
-- `noCache()`, `cache()`, `noContent()`
-- `file()`, `download()`
-- `send()`
-- `sendAndContinue()`
-
-`send()`:
-
-- Handles redirects by sending `Location` and exiting.
-- Converts arrays and `Arrayable` objects to JSON.
-- Converts non-string content to string.
-- Calls `http_response_code()`.
-- Sends all headers.
-- Echoes content.
-
-When returning arrays or `Arrayable` from a route, `Router::parseHttpResponse()` creates a `Response`, and `Response::send()` will JSON encode.
+Use helpers only when they already match the app style. In service classes, dependency injection is often cleaner.
 
 ## Routing
 
-Main classes:
+Routes are usually written in `routes/web.php`, `routes/api.php`, or `routes/webhook.php`.
 
-- `Spark\Routing\Router`
-- `Spark\Routing\Route`
-- `Spark\Routing\RouteGroup`
-- `Spark\Routing\RouteResource`
-
-Route definitions are builder objects. Example:
+The route helper returns the router:
 
 ```php
-route()->get('/users/{id}', [UserController::class, 'show'])->name('users.show');
-route()->post('/users', [UserController::class, 'store'])->middleware('auth');
-route()->group(['prefix' => 'api', 'middleware' => ['cors']], function () {
-    route()->get('/health', fn() => ['ok' => true]);
+use Spark\Facades\Route;
+use App\Http\Controllers\UserController;
+
+Route::get('/users', [UserController::class, 'index'])->name('users.index');
+Route::get('/users/{id}', [UserController::class, 'show'])->name('users.show');
+Route::post('/users', [UserController::class, 'store'])->middleware('auth');
+Route::put('/users/{id}', [UserController::class, 'update']);
+Route::patch('/users/{id}', [UserController::class, 'update']);
+Route::delete('/users/{id}', [UserController::class, 'destroy']);
+```
+
+Supported route methods:
+
+```php
+Route::get($path, $callback);
+Route::post($path, $callback);
+Route::put($path, $callback);
+Route::patch($path, $callback);
+Route::delete($path, $callback);
+Route::options($path, $callback);
+Route::any($path, $callback);
+Route::match(['GET', 'POST'], $path, $callback);
+Route::view('/about', 'pages.about');
+Route::fireline('/email-preview', 'emails.welcome');
+Route::inertia('/contact', 'Contact', ['key' => 'value']);
+Route::redirect('/old', '/new', 301);
+Route::fallback(fn() => response('Not found', 404));
+```
+
+Route parameters:
+
+```php
+Route::get('/posts/{id}', fn(int $id) => "Post $id");
+Route::get('/posts/{id?}', fn(?string $id = null) => $id);
+Route::get('/files/*', fn() => 'wildcard');
+```
+
+Route groups:
+
+```php
+use App\Http\Controllers\Api\UserController;
+
+Route::group(['prefix' => 'admin', 'middleware' => ['auth']], function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+});
+
+Route::group(['prefix' => 'api', 'middleware' => ['cors'], 'withoutMiddleware' => ['csrf']], function () {
+    Route::get('/users', [UserController::class, 'index']);
 });
 ```
 
-Router supports:
-
-- HTTP verbs: `get`, `post`, `put`, `patch`, `delete`, `options`
-- `any`
-- `match`
-- `view`
-- `fireline`
-- `redirect`
-- `resource`
-- `group`
-- `fallback`
-- route `name`, `prefix`, `path`, `middleware`, `withoutMiddleware`
-
-Dispatch:
-
-1. Iterate registered routes.
-2. `matchRoute()` checks HTTP method and path.
-3. On match, route params are merged into `Request`.
-4. Resolve `Middleware`.
-5. Convert template routes to view callbacks.
-6. Execute route through middleware pipeline.
-7. Destination calls route callback through container `Application::$app->call()`.
-8. Parse result to `Response`.
-
-Route path matching:
-
-- `HEAD` requests are treated as `GET`.
-- Required params: `/users/{id}`
-- Optional params: `/users/{id?}`
-- Wildcard segment: `*`
-- Matching allows optional trailing slash.
-- Route params are mapped by declaration order.
-
-CORS preflight routing:
-
-- A request is CORS preflight when method is `OPTIONS` and it has both `Origin` and `Access-Control-Request-Method`.
-- If a route explicitly allows `OPTIONS`, it handles the request normally.
-- If not, router compares the route method against `Access-Control-Request-Method` so route-level CORS middleware can respond.
-- Defensive behavior: if no middleware stops synthetic preflight, router returns empty `204` instead of executing a non-OPTIONS controller.
-
-## Middleware Pipeline
-
-Main class: `Spark\Http\Middleware`
-
-Middleware registration:
+Controller grouping:
 
 ```php
-app()->withMiddleware(
-    register: [
-        'auth' => App\Http\Middlewares\AuthMiddleware::class,
-        'cors' => App\Http\Middlewares\CorsMiddleware::class,
-    ],
-    queue: ['csrf']
-);
+Route::group(['prefix' => 'users', 'callback' => UserController::class], function () {
+    Route::get('/', 'index')->name('users.index');
+    Route::post('/', 'store')->name('users.store');
+    Route::get('/{id}', 'show')->name('users.show');
+});
 ```
 
-Core behavior:
-
-- `register($alias, $middleware)`
-- `registerMany($map)`
-- `queue($middleware)` for global/default stack
-- `process($request, $queue = [], $except = [], $destination = null)`
-- Middleware names can include parameters: `throttle:60,1,api`
-- Route middleware is combined with global stack, then `withoutMiddleware` filters by alias base name.
-- Pipeline is built from the end backwards.
-- Standard middleware signature:
+Resource routes:
 
 ```php
-public function handle(Request $request, Closure $next, ...$parameters): mixed
+Route::resource('/posts', PostController::class, name: 'posts');
+```
+
+Resource route method map:
+
+- `GET /posts` -> `index`
+- `GET /posts/create` -> `create`
+- `POST /posts` -> `store`
+- `GET /posts/{id}` -> `show`
+- `GET /posts/{id}/edit` -> `edit`
+- `PUT/PATCH /posts/{id}` -> `update`
+- `DELETE /posts/{id}` -> `destroy`
+
+## Controllers
+
+Generated controller stubs usually extend an app-level `Controller` class. Follow existing app convention.
+
+Example API controller:
+
+```php
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controller;
+use App\Models\Post;
+use Spark\Http\Request;
+
+class PostController extends Controller
 {
-    return $next($request);
+    public function index(): array
+    {
+        return [
+            'data' => Post::latest()->take(20)->all(),
+        ];
+    }
+
+    public function show(int $id): array
+    {
+        $post = Post::findOrFail($id);
+
+        return ['data' => $post];
+    }
+
+    public function store(Request $request): \Spark\Http\Response
+    {
+        $data = $request->validate([
+            'title' => 'required|string|max:255',
+            'body' => 'required|string',
+        ]);
+
+        $post = Post::create($data);
+
+        return json(['data' => $post], 201);
+    }
+
+    public function update(int $id, Request $request): array
+    {
+        $post = Post::findOrFail($id);
+        $post->fill($request->only(['title', 'body']));
+        $post->save();
+
+        return ['data' => $post];
+    }
+
+    public function destroy(int $id): \Spark\Http\Response
+    {
+        Post::findOrFail($id)->remove();
+
+        return response('', 204);
+    }
 }
 ```
 
-Middleware may:
+Route callbacks and controller methods can return:
 
-- Return a `Response` or response-like value early.
-- Throw a framework exception.
-- Call `$next($request)` and mutate the returned `Response`.
+- `Spark\Http\Response`
+- string
+- integer HTTP status code
+- array
+- object castable to string
+- `Arrayable`
 
-## Built-In Middleware
+Arrays are JSON encoded by `Response::send()`.
+
+## Requests and Validation
+
+Base request: `Spark\Http\Request`
+
+Form request: `Spark\Foundation\Http\FormRequest`
+
+Form requests validate immediately in the constructor:
+
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use Spark\Foundation\Http\FormRequest;
+
+class StorePostRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return auth()->check();
+    }
+
+    public function rules(): array
+    {
+        return [
+            'title' => 'required|string|max:255',
+            'body' => 'required|string',
+            'published' => 'nullable|boolean',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'title.required' => 'A title is required.',
+        ];
+    }
+}
+```
+
+Use in a controller:
+
+```php
+public function store(StorePostRequest $request)
+{
+    $data = $request->validated()->toArray();
+}
+```
+
+Common validation rules:
+
+- `required`, `required_if`, `required_unless`
+- `present`, `filled`, `nullable`
+- `email`, `url`
+- `string`, `text`, `char`
+- `numeric`, `number`, `int`, `integer`
+- `array`, `list`
+- `min`, `max`, `size`, `between`
+- `same`, `confirmed`
+- `in`, `not_in`
+- `regex`
+- `unique`, `exists`, `not_exists`
+- `boolean`, `float`, `decimal`
+- `alpha`, `alpha_num`, `alpha_dash`
+- `digits`, `digits_between`, `min_digits`, `max_digits`
+- `date`, `date_format`, `before`, `after`
+- `json`, `ip`, `ipv4`, `ipv6`, `mac_address`, `uuid`
+- `lowercase`, `uppercase`
+- `starts_with`, `ends_with`, `contains`, `not_contains`
+- `accepted`, `declined`, `prohibited`
+- `file`, `image`, `mimes`
+- `password`
+
+Request input helpers:
+
+```php
+$request->query('page', 1);
+$request->post('email');
+$request->input('email');
+$request->only(['name', 'email']);
+$request->except(['password']);
+$request->safe('body', ['p', 'strong']);
+$request->input()->boolean('published'); // through validated Input object
+```
+
+## Middleware
+
+Middleware implements `Spark\Contracts\Http\MiddlewareInterface`.
+
+```php
+<?php
+
+namespace App\Http\Middlewares;
+
+use Spark\Contracts\Http\MiddlewareInterface;
+use Spark\Http\Request;
+
+class EnsureAdmin implements MiddlewareInterface
+{
+    public function handle(Request $request, \Closure $next): mixed
+    {
+        if (!auth()->check() || !auth()->user('is_admin')) {
+            abort(403, 'Forbidden');
+        }
+
+        return $next($request);
+    }
+}
+```
+
+Register aliases in `bootstrap/middlewares.php`:
+
+```php
+<?php
+
+return [
+    'auth' => App\Http\Middlewares\Authenticate::class,
+    'admin' => App\Http\Middlewares\EnsureAdmin::class,
+    'csrf' => App\Http\Middlewares\VerifyCsrfToken::class,
+    'cors' => App\Http\Middlewares\Cors::class,
+    'throttle' => App\Http\Middlewares\ThrottleRequests::class,
+];
+```
+
+Attach middleware:
+
+```php
+Route::get('/admin', [AdminController::class, 'index'])->middleware(['auth', 'admin']);
+Route::post('/webhook', [WebhookController::class, 'store'])->withoutMiddleware('csrf');
+Route::get('/limited', fn() => 'ok')->middleware('throttle:60,1,api');
+```
+
+Middleware parameters are parsed after `:`, comma-separated.
+
+Middleware can wrap responses:
+
+```php
+public function handle(Request $request, \Closure $next): mixed
+{
+    $response = $next($request);
+
+    if ($response instanceof \Spark\Http\Response) {
+        $response->setHeader('X-App', 'TinyMVC');
+    }
+
+    return $response;
+}
+```
+
+## Built-In Middleware Base Classes
 
 ### CORS
 
-Base class: `Spark\Foundation\Http\Middlewares\CorsAccessControl`
+Extend `Spark\Foundation\Http\Middlewares\CorsAccessControl`.
 
-It is abstract. Applications should extend it and set protected `$config`.
+```php
+<?php
 
-Config keys:
+namespace App\Http\Middlewares;
 
-- `origin`: `'*'`, string, comma-separated string, or array. Supports wildcard patterns such as `https://*.example.com`.
-- `credentials`: bool-like.
-- `age`: max age seconds.
-- `methods`: array or comma-separated string. Defaults to `GET, POST, PUT, PATCH, DELETE, OPTIONS`.
-- `headers`: array or comma-separated string. Defaults to common JSON/AJAX/auth/CSRF headers.
+use Spark\Foundation\Http\Middlewares\CorsAccessControl;
+
+class Cors extends CorsAccessControl
+{
+    protected array $config = [
+        'origin' => ['https://example.com', 'https://*.example.com'],
+        'credentials' => true,
+        'age' => 600,
+        'methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        'headers' => ['Content-Type', 'Authorization', 'X-XSRF-TOKEN'],
+    ];
+}
+```
 
 Behavior:
 
-- If no `Origin`, pass through without headers.
-- If origin not allowed, pass through without headers.
-- Preflight:
-  - Requires `OPTIONS`, `Origin`, and `Access-Control-Request-Method`.
-  - Validates requested method and requested headers.
-  - Returns `403` for invalid preflight.
-  - Returns `204` with `Access-Control-Allow-*` headers for valid preflight.
-- Normal CORS:
-  - Calls `$next($request)`.
-  - Converts non-Response results to `Response`.
-  - Adds `Access-Control-Allow-Origin`.
-  - Adds `Access-Control-Allow-Credentials: true` only when enabled.
-  - Adds `Vary: Origin` when allowed origin is not `*`.
-- Does not send `Access-Control-Allow-Credentials: false`.
-- `Access-Control-Max-Age`, allow methods, and allow headers are sent only for preflight.
+- Normal requests get CORS headers after the route response.
+- Valid preflight returns `204`.
+- Invalid preflight returns `403`.
+- Wildcard origins such as `https://*.example.com` are supported.
+- `credentials => true` reflects concrete origins instead of using `*`.
 
 ### CSRF
 
-Base class: `Spark\Foundation\Http\Middlewares\CsrfProtection`
+Extend `Spark\Foundation\Http\Middlewares\CsrfProtection`.
 
-It is abstract. Applications may extend and set protected `$except`.
+```php
+<?php
 
-Behavior:
+namespace App\Http\Middlewares;
 
-- `skip()` matches request paths against `$except`; supports wildcard patterns.
-- Ensures a session CSRF token and `XSRF-TOKEN` cookie exist.
-- Validates only unsafe/postback methods: `POST`, `PUT`, `PATCH`, `DELETE`.
-- Accepts `_token` post field, `X-XSRF-TOKEN`, or `X-CSRF-TOKEN`.
-- Header token may be plain session token or encrypted token.
-- Invalid/missing token throws `InvalidCsrfTokenException`.
-- Application maps that exception to HTTP 419.
+use Spark\Foundation\Http\Middlewares\CsrfProtection;
 
-API routes are configured by `Application::withRouting()` to exclude `csrf` by default.
+class VerifyCsrfToken extends CsrfProtection
+{
+    protected array $except = [
+        'webhook/*',
+    ];
+}
+```
+
+CSRF validates `POST`, `PUT`, `PATCH`, and `DELETE`. It accepts `_token`, `X-CSRF-TOKEN`, or `X-XSRF-TOKEN`. Invalid tokens throw an exception mapped to HTTP 419.
 
 ### Throttle
 
-Base class: `Spark\Foundation\Http\Middlewares\ThrottleIncomingRequests`
+Extend `Spark\Foundation\Http\Middlewares\ThrottleIncomingRequests`.
 
-Parameter order:
+```php
+<?php
 
-```text
-throttle:{attempts},{minutes},{suffix}
+namespace App\Http\Middlewares;
+
+use Spark\Foundation\Http\Middlewares\ThrottleIncomingRequests;
+
+class ThrottleRequests extends ThrottleIncomingRequests
+{
+}
+```
+
+Use as:
+
+```php
+Route::get('/api/search', [SearchController::class, 'index'])
+    ->middleware('throttle:100,1,search');
+```
+
+Parameter order is `attempts, minutes, suffix`.
+
+## Models
+
+Models extend `Spark\Database\Model`.
+
+```php
+<?php
+
+namespace App\Models;
+
+use Spark\Database\Model;
+
+class Post extends Model
+{
+    protected string $table = 'posts';
+
+    protected array $guarded = [];
+
+    protected array $casts = [
+        'published' => 'boolean',
+        'meta' => 'array',
+        'published_at' => 'datetime',
+    ];
+}
 ```
 
 Defaults:
 
-- attempts: `50`
-- minutes: `1`
-- suffix: `''`
+- Table defaults to snake plural class name if not set.
+- Primary key defaults to `id`.
+- Timestamps are enabled by default with `created_at` and `updated_at`.
+- Timestamp columns are date/datetime parsed when timestamps are enabled.
 
-Behavior:
+Mass assignment:
 
-- Uses client IP, request method, request path, and suffix to build a cache key.
-- Stores timestamps in `Cache('th:requests')`.
-- Rejects when request count within window is >= attempts.
-- Throws `TooManyRequests`, mapped by `Application` to HTTP 429.
-- Uses configured cache driver, so throttle storage follows `config('cache')`.
+- Use `$guarded = []` to allow all fields.
+- Use `$fillable = [...]` to allow only specific fields.
+- Avoid passing unvalidated request data directly to `create()` or `fill()`.
 
-## Authentication and Authorization
-
-Main classes:
-
-- `Spark\Http\Auth`
-- `Spark\Http\Gate`
-- `Spark\Http\Session`
-
-Auth:
-
-- Configured through `config('auth', ...)`.
-- Uses a model class, defaulting from config or constructor.
-- Tracks user id and user cache.
-- Supports session/cookie auth, JWT auth, basic auth, and custom auth drivers.
-- Public API includes:
-  - `user($key = null, $default = null)`
-  - `id()`, `getId()`, `hasId()`
-  - `attempt($credentials)`
-  - `login(Model $user, bool $remember = false)`
-  - `logout()`
-  - `check()`, `isGuest()`, `isLogged()`
-  - `getJwtToken()`, `createJwtToken()`
-  - `refresh()`, `clearCache()`
-
-Gate:
-
-- Define abilities with `define($ability, $callback)`.
-- Add hooks with `before()` and `after()`.
-- Check with `allows()`, `denies()`, `any()`, `none()`.
-- Enforce with `authorize()`, which throws `AuthorizationException`.
-
-Session:
-
-- Starts only in web mode and only if headers are not already sent.
-- Static methods for `get`, `set`, `put`, `forget`, `flush`, `pull`, `invalidate`, `regenerate`, `destroy`, `id`, `flash`, `getFlash`, `clearFlash`, `all`, `close`.
-
-## Database
-
-Main classes:
-
-- `Spark\Database\DB`
-- `Spark\Database\QueryBuilder`
-- `Spark\Database\Model`
-- `Spark\Database\Migration`
-- `Spark\Database\Schema\Schema`
-- `Spark\Database\Schema\Blueprint`
-- `Spark\Database\Casts\Castable`
-- `Spark\Database\Casts\Attribute`
-
-### DB
-
-`DB` is a PDO wrapper.
-
-Config:
-
-- Reads `config('database')` when constructed without explicit config.
-- Supports a `connections` map.
-- Driver key chooses a matching connection; fallback is `default`.
-- Normalizes:
-  - `username` -> `user`
-  - non-sqlite `database` -> `name`
-  - sqlite `file` or `path` -> `database`
-
-Driver helpers:
-
-- `getDriver()`
-- `isMySQL()`
-- `isSQLite()`
-- `isPostgreSQL()`
-- `isDriver()`
-
-Common methods:
-
-- `getPdo()`
-- `query()`
-- `statement()`
-- `prepare()`
-- `exec()`
-- `resetConfig()`
-- `resetPdo()`
-
-### Query Builder
-
-`QueryBuilder` is chainable and also used behind `Model::__callStatic`.
-
-Core API includes:
-
-- `table()`, `from()`, `as()`, `select()`, `selectRaw()`, `column()`
-- `where()`, `orWhere()`, `notWhere()`, raw wheres, grouped wheres
-- `whereNull`, `whereIn`, `between`, `like`, contains/starts/ends
-- JSON helpers such as `findInJson`, `whereJsonContains`
-- joins and join conditions
-- `orderBy`, `orderAsc`, `orderDesc`, `groupBy`, `having`
-- `limit`, `offset`, `take`, `skip`
-- `insert`, `bulkUpdate`, `update`, `delete`, `truncate`
-- `first`, `firstOrFail`, `last`, `all`, `get`, `paginate`
-- `value`, `pluck`, aggregates, `count`, `exists`, `notExists`
-- `updateOrInsert`, `create`, `increment`, `decrement`
-- `toSql()`, `clone()`, `copy()`
-
-It handles bindings and named parameters internally. Prefer builder APIs over raw SQL unless raw SQL is needed.
-
-### Model
-
-`Model` is an active-record-like base class.
-
-Important properties for subclasses:
+Create/update:
 
 ```php
-protected string $table;
-protected string $primaryKey;
-protected array $fillable = [];
-protected array $guarded = [];
-protected array $hidden = [];
-protected array $appends = [];
-protected array $casts = [];
+$post = Post::create([
+    'title' => $request->post('title'),
+    'body' => $request->post('body'),
+]);
 
-protected const USE_TIMESTAMPS = true;
-protected const CREATED_AT = 'created_at';
-protected const UPDATED_AT = 'updated_at';
+$post = Post::findOrFail($id);
+$post->fill($request->only(['title', 'body']));
+$post->save();
+
+$post->remove();
 ```
 
-Behavior:
+Querying:
 
-- Table defaults to snake plural class basename.
-- Primary key defaults to `id`.
-- `query()` returns a `QueryBuilder` for the model table and fetches model instances.
-- `fill()` updates attributes and applies casts.
-- `save()` inserts or updates depending on primary key, applies casts, and manages timestamps when enabled.
-- Timestamp-enabled models should treat `created_at` and `updated_at` as datetime values.
-- Model supports array access, magic properties, `toArray()`, `toJson()`, visibility, appends, dirty tracking, original tracking, nested attribute tracking, event hooks, and relations.
-- Dynamic static calls forward to query builder, for example `User::where(...)->first()`.
+```php
+$posts = Post::where('status', 'published')
+    ->latest()
+    ->take(10)
+    ->all();
 
-Model creation helpers:
-
-- `create()`
-- `createOrUpdate()`
-- `firstOrCreate()`
-- `firstOrNew()`
+$post = Post::where('slug', $slug)->first();
+$post = Post::findOrFail($id);
+$exists = Post::where('email', $email)->exists();
+```
 
 Casts:
 
-- Native casts: `int`, `integer`, `real`, `float`, `double`, `decimal`, `string`, `bool`, `boolean`, `object`, `array`, `json`, `collection`, `date`, `datetime`, `timestamp`, `encrypted`, `hashed`.
-- Custom cast classes implement `Spark\Database\Contracts\CastsAttributes`.
-- `Attribute::make($get, $set)` supports accessor/mutator style casts.
+- `int`, `integer`
+- `float`, `double`, `real`
+- `decimal:2`
+- `string`
+- `bool`, `boolean`
+- `array`, `json`, `object`
+- `collection`
+- `date`, `datetime`, `timestamp`
+- `encrypted`
+- `hashed`
+- custom cast class implementing `Spark\Database\Contracts\CastsAttributes`
 
-### Schema and Migrations
+Accessors/mutators:
 
-Schema:
+```php
+use Spark\Database\Casts\Attribute;
 
-- `Schema::create($table, fn(Blueprint $table) => ...)`
-- `Schema::table($table, fn(Blueprint $table) => ...)`
-- `Schema::drop()`, `dropIfExists()`, `rename()`
-- `hasTable()`, `hasColumn()`, `hasColumns()`, `getColumnListing()`
-- Foreign key constraint toggles.
+class User extends Model
+{
+    public function nameAttribute(): Attribute
+    {
+        return Attribute::make(
+            get: fn($value) => trim((string) $value),
+            set: fn($value) => trim((string) $value),
+        );
+    }
+}
+```
 
-Blueprint supports many Laravel-like methods:
+Relations exist in `Spark\Database\Relation` and through model relation traits. Prefer following existing app examples before inventing relation syntax.
+
+## Query Builder
+
+Use `query($table)` or model static calls.
+
+```php
+$users = query('users')
+    ->where('active', true)
+    ->orderDesc('id')
+    ->take(20)
+    ->all();
+
+$id = query('users')->insert([
+    'name' => 'Jane',
+    'email' => 'jane@example.com',
+]);
+
+query('users')->where('id', $id)->update(['active' => false]);
+query('users')->where('id', $id)->delete();
+```
+
+Common methods:
+
+- `table`, `from`, `select`, `selectRaw`, `column`
+- `where`, `orWhere`, `whereRaw`, `grouped`
+- `whereNull`, `whereIn`, `between`, `like`
+- `whereDate`, `whereYear`, `whereMonth`
+- JSON helpers
+- joins
+- `orderBy`, `orderAsc`, `orderDesc`
+- `limit`, `offset`, `take`, `skip`
+- `first`, `firstOrFail`, `last`, `all`, `get`, `paginate`
+- `value`, `pluck`, `count`, `exists`, `notExists`
+- `insert`, `bulkUpdate`, `update`, `delete`, `truncate`
+- `updateOrInsert`, `increment`, `decrement`
+- `toSql`
+
+Prefer builder methods over string SQL. Use `whereRaw` or `raw` only when needed.
+
+## Migrations and Schema
+
+Migration files return an anonymous class with `up()` and `down()`.
+
+```php
+<?php
+
+use Spark\Database\Schema\Blueprint;
+use Spark\Database\Schema\Schema;
+
+return new class {
+    public function up(): void
+    {
+        Schema::create('posts', function (Blueprint $table) {
+            $table->id();
+            $table->string('title');
+            $table->text('body');
+            $table->boolean('published')->default(false);
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('posts');
+    }
+};
+```
+
+Useful blueprint methods:
 
 - `id`, `increments`, `bigIncrements`
 - integer variants
@@ -643,462 +892,374 @@ Blueprint supports many Laravel-like methods:
 - `boolean`, `enum`, `json`
 - `date`, `dateTime`, `time`, `timestamp`
 - `timestamps`, `nullableTimestamps`, `softDeletes`, `rememberToken`
-- indexes: `primary`, `unique`, `index`, `fullText`, `spatialIndex`
-- foreign keys: `foreignId`, `nullableForeignId`, `foreign`, `constrained`
-- alter helpers: `dropColumn`, `dropIndex`, `dropForeign`, `renameColumn`
+- `foreignId`, `nullableForeignId`, `foreign`, `constrained`
+- `primary`, `unique`, `index`, `fullText`, `spatialIndex`
+- `dropColumn`, `dropIndex`, `dropForeign`, `renameColumn`
 
-Migration:
+Column modifiers:
 
-- `Migration` runs migration files from a migrations folder.
-- Tracks applied migrations.
-- Supports `up`, `down`, and `refresh`.
+```php
+$table->string('email')->unique();
+$table->text('body')->nullable();
+$table->boolean('active')->default(true);
+$table->timestamp('published_at')->nullable();
+```
+
+## Auth and Authorization
+
+Auth helper:
+
+```php
+auth()->attempt(['email' => $email, 'password' => $password]);
+auth()->login($user, remember: true);
+auth()->logout();
+auth()->check();
+auth()->isGuest();
+auth()->isLogged();
+auth()->user();
+auth()->id();
+```
+
+Gate:
+
+```php
+gate()->define('update-post', function ($user, $post) {
+    return $user && $post->user_id === $user->id;
+});
+
+if (can('update-post', $post)) {
+    // allowed
+}
+
+authorize('update-post', $post); // throws AuthorizationException on deny
+```
+
+`AuthorizationException` is mapped to HTTP 403.
 
 ## Cache
 
-Main class: `Spark\Utils\Cache`
-
-Driver source: `config('cache.driver')`
-
-Drivers:
-
-- `sqlite`
-- `redis`
-
-SQLite:
-
-- Uses `cache.connections.sqlite.path`.
-- If path is directory-like, creates `{md5(name)}.cache` under that directory.
-- Creates a `caches` table with key, data, created_at, expire_at.
-- Uses WAL and performance pragmas.
-
-Redis:
-
-- Uses `cache.connections.redis`.
-- Uses `RedisConnector`.
-- Key prefix shape includes configured prefix, `cache`, and md5 cache name.
-
-API:
-
-- `Cache::make($name)`
-- `has($key, $eraseExpired = false)`
-- `store($key, $data, $expire = null)`
-- `load($key, $callback, $expire = null)`
-- `retrieve($keyOrKeys, $eraseExpired = false)`
-- `metadata($key)`
-- `retrieveAll()`
-- `erase($keyOrKeys)`
-- `eraseExpired()`
-- `getExpired()`
-- `flush()`, `clear()`, `flushIf()`
-- `storeMany()`, `storeManyWithExpiry()`
-- `increment()`, `decrement()`
-- `add()`
-- `remember()`
-- `pull()`
-- `ttl()`
-- `stats()`
-- `optimize()`
-- array access methods
-
-Helpers:
+Use:
 
 ```php
-cache('default')->store('key', 'value', '+5 minutes');
+cache('default')->store('key', $value, '+10 minutes');
 $value = cache('default')->retrieve('key');
+$value = cache('default')->remember('key', fn() => expensive(), '+10 minutes');
+cache('default')->erase('key');
+cache('default')->flush();
 ```
 
-## Lock
+Cache driver is configured by `config('cache.driver')`.
 
-Main class: `Spark\Utils\Lock`
+SQLite cache:
 
-Driver source: `config('cache.driver')`
+- `cache.connections.sqlite.path` can be a directory.
+- The cache class creates one sqlite cache file per cache name.
 
-Lock intentionally shares cache config, not queue config.
-
-SQLite:
-
-- Uses `cache.connections.sqlite.lock_path` if present, else `path`.
-- Directory-like paths create `{md5(name)}.lock`.
-
-Redis:
+Redis cache:
 
 - Uses `cache.connections.redis`.
-- Prefix shape includes configured prefix, `lock`, and md5 lock namespace.
+- Uses configured prefix.
 
-API:
+## Locks
 
-- `Lock::make($name)`
-- `lock($key, $timeout = 10, $waitTimeout = 5)`
-- `unlock($key)`
-- `unlockAll()`
-- `isLocked($key)`
-- `ownsLock($key)`
-- `releaseExpiredLocks()`
-- `extendLock($key, $additionalSeconds)`
-- `withLock($key, $callback, $timeout = 10, $waitTimeout = 5)`
-- `getLockOwner()`
-- `getLockInfo($key)`
-- `forceUnlock($key)`
-- `optimize()`
-- array access methods
-
-Helper:
+Use locks for critical sections.
 
 ```php
-lock('critical-section', timeout: 10, waitTimeout: 5);
-lock(name: 'default')->withLock('critical-section', fn() => do_work());
+lock(name: 'default')->withLock('invoice:' . $invoiceId, function () use ($invoice) {
+    // critical work
+}, timeout: 10, waitTimeout: 5);
 ```
 
-## Queue
-
-Main classes:
-
-- `Spark\Queue\Queue`
-- `Spark\Queue\Job`
-
-Driver source: `config('queue.driver')`
-
-Drivers:
-
-- `sqlite`
-- `redis`
-
-SQLite:
-
-- Uses `queue.connections.sqlite.path`.
-- Directory-like paths create `jobs.db`.
-- Stores jobs, statuses, attempts, failure reasons, repeat schedules.
-
-Redis:
-
-- Uses `queue.connections.redis`.
-- Uses Redis hashes and sorted sets for pending/reserved/failed/repeated jobs.
-- Prefix shape includes configured prefix and queue namespace.
-
-Application integration:
+Or:
 
 ```php
-app()->withQueue(
+$lock = lock(name: 'default');
+
+if ($lock->lock('report:daily', 30, 5)) {
+    try {
+        // work
+    } finally {
+        $lock->unlock('report:daily');
+    }
+}
+```
+
+Lock driver follows cache config.
+
+## Queue and Jobs
+
+Jobs may implement `Spark\Queue\Contracts\JobInterface`.
+
+```php
+<?php
+
+namespace App\Jobs;
+
+use Spark\Queue\Contracts\JobInterface;
+
+class SendWelcomeEmail implements JobInterface
+{
+    public function handle(): void
+    {
+        // send email
+    }
+}
+```
+
+Dispatch:
+
+```php
+job(App\Jobs\SendWelcomeEmail::class)->dispatch('emails');
+job(App\Jobs\SyncReports::class)->repeatEveryMinutes(5)->dispatchOnce('reports');
+```
+
+In `bootstrap/app.php`, recurring jobs should be registered with `withQueue()` and `pushOnce()` behavior:
+
+```php
+->withQueue(
     jobs: [
-        job([TaskRunner::class, 'handle'])->repeatEveryMinutes(5),
+        job(App\Jobs\SyncReports::class)->repeatEveryMinutes(5),
     ],
     log: true
-);
+)
 ```
 
-`Application::withQueue()` creates a queue singleton and pushes configured jobs with `pushOnce()`.
-
-Job API:
-
-- `Job::make($callback, $parameters = [], $queue = 'default', $metadata = [])`
-- `repeat($repeat)`
-- `repeatEveryMinutes($minutes = 1)`
-- `repeatHourly()`, `repeatDaily()`, `repeatWeekly()`, `repeatMonthly()`
-- `schedule($time)`
-- `delay($seconds)`
-- `handle()`
-- `dispatch($queue = 'default')`
-- `dispatchOnce($queue = 'default')`
-- metadata getters, display name, failure information
-
-Queue API:
-
-- `push($job, $queue = 'default')`
-- `pushOnce($job, $queue = 'default')`
-- `work($queue = 'default', ...)`
-- `getJobs()`
-- `getFailedJobs()`
-- `retryFailedJobs()`
-- `clearAllJobs()`
-- `clearRepeatedJobs()`
-- `clearFailedJobs()`
-- `removeJobById()`
-- `removeQueue()`
-- `logging()`
+Queue driver is configured by `config('queue.driver')`.
 
 Important:
 
-- `pushOnce()` prevents duplicate scheduled/repeated jobs using queue-specific uniqueness/fingerprint behavior.
-- Use it for scheduler/cron-style jobs registered in `bootstrap/app.php`.
-- Do not mix cache and queue config: queue has its own `config('queue')`.
-
-## Redis Connector
-
-Main class: `Spark\Utils\RedisConnector`
-
-Shared by cache, lock, and queue.
-
-Config supports:
-
-- `host`
-- `port`
-- `password`
-- `database`
-- `prefix`
-- `timeout`
-- `read_timeout`
-- `retry_interval`
-- `persistent`
-- `persistent_id`
-- `username`
-- `url`
-- `options`
-
-`resolveConnectionConfig()` merges defaults, parses `url` when present, normalizes values, and returns a connection-ready array.
+- Use `dispatchOnce()` or `withQueue(jobs: [...])` for scheduler/cron-style repeated jobs.
+- Queue has separate config from cache.
+- Redis and sqlite drivers should behave consistently for push/pushOnce/work.
 
 ## Views
 
-Main classes:
+Return views from routes/controllers:
 
-- `Spark\View\Blade`
-- `Spark\View\BladeCompiler`
-- `Spark\View\Attributes`
+```php
+return view('posts.index', ['posts' => $posts]);
+```
 
-Blade:
+Blade-like templates live under `resources/views` in many apps.
 
-- Default view path and cache path come from helpers/config conventions.
-- Supports `render`, `include`, `component`, sections, layouts, composers, shared data, custom directives, attribute compilation, and cache clearing.
-- Helper `view($template, $context)` returns a `Response` when a template is passed, or the Blade instance when no template is passed.
-- Helper `fireline($template, $context)` returns a Fireline-style response.
+Common view helpers:
 
-Blade compiler supports:
+```php
+view('template.name', $context);
+blade()->render('template.name', $context);
+Blade::share('key', $value);
+```
 
-- `@extends`, `@section`, `@yield`, includes
-- component tags
-- echo compilation
-- PHP blocks
-- custom directives
-- compiled path expiration and cache clearing
+Use existing app template style. TinyCore has its own Blade-like compiler, not full Laravel Blade.
 
-## Console and Commands
+## Responses and Redirects
 
-Main classes:
+```php
+return response('Saved', 200);
+return json(['saved' => true], 201);
+return redirect('/login');
+return to_route('posts.show', ['id' => $post->id]);
+return back()->withErrors(['email' => 'Invalid'])->withInput();
+return response('', 204);
+```
 
-- `Spark\Console\Console`
-- `Spark\Console\Commands`
-- `Spark\Foundation\Providers\ConsoleServiceProvider`
-- `Spark\Foundation\Console\PrimaryCommandsHandler`
-- `Spark\Foundation\Console\MakeStubCommandsHandler`
+For APIs, returning arrays is acceptable because `Response::send()` JSON encodes arrays.
 
-Commands:
+For explicit JSON status codes, prefer `json($data, $status)`.
 
-- Registered in `Commands`.
-- Console parses CLI args and executes registered callback.
-- `ConsoleServiceProvider` registers core commands and stubs.
-- Helpers include `command()`.
+## Files and Uploads
 
-Common command families include:
+Request file helpers:
 
-- cache/config/view clearing
-- app key generation
-- migration commands
-- queue commands
-- make stubs for controllers, models, migrations, middleware, requests, jobs, providers, casts, seeders, views
+```php
+if ($request->hasFile('avatar')) {
+    $file = $request->file('avatar');
+    $request->moveFile('avatar', storage_dir('uploads/avatar.jpg'));
+}
+```
+
+Utilities:
+
+- `uploader()`
+- `filemanager()` or `fm()`
+- `image()`
+
+Inspect existing app usage before implementing uploads.
+
+## Mail and HTTP Client
+
+Helpers/facades:
+
+```php
+mailer();
+http();
+```
+
+HTTP client classes live under `Spark\Http\Client`.
+
+Mail utility depends on optional `phpmailer/phpmailer`.
+
+## Service Providers
+
+Providers extend `Spark\Foundation\Providers\ServiceProvider`.
+
+```php
+<?php
+
+namespace App\Providers;
+
+use Spark\Foundation\Providers\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        app()->singleton(App\Services\BillingService::class);
+    }
+
+    public function boot(): void
+    {
+        // boot code
+    }
+}
+```
+
+Register providers in `bootstrap/app.php` through `Application::create(... providers: [...])` or `withApp(providers: [...])`.
 
 ## Events
 
-Main class: `Spark\Events`
+```php
+event('order.created', $order);
 
-API:
+app()->on('order.created', function ($order) {
+    // handle event
+});
+```
 
-- `addListener()`
-- `dispatch()`
-- `dispatchWithResponse()`
-- `dispatchIf()`
-- `dispatchUnless()`
-- `once()`
-- `removeListener()`
-- `until()`
-- `halt()`
-- `subscribe()`
-- `flush()`
+The event dispatcher supports priorities, one-time listeners, dispatch with responses, `until`, and subscriptions.
 
-Application debug lifecycle events include:
+## Console Commands
 
-- `app:booting`
-- `app:booted`
-- `app:routeMatched`
-- `app:middlewaresHandled`
-- `app:routeDispatched`
-- `app:routeFallback`
-- `app:terminated`
+Command routes may be loaded through `withRouting(commands: __DIR__ . '/routes/console.php')`.
+
+Use the command registry:
+
+```php
+command('reports:sync', [ReportCommand::class, 'handle'])
+    ->description('Sync reports');
+```
+
+Follow existing app command style.
 
 ## Facades
 
-Base: `Spark\Facades\Facade`
+Available facades include:
 
-Facades resolve services from `Application::$app->make(static::getFacadeAccessor())` and forward static calls to instance methods/macros.
+```php
+use Spark\Facades\App;
+use Spark\Facades\Auth;
+use Spark\Facades\Blade;
+use Spark\Facades\Cache;
+use Spark\Facades\DB;
+use Spark\Facades\Event;
+use Spark\Facades\Gate;
+use Spark\Facades\Hash;
+use Spark\Facades\Http;
+use Spark\Facades\Lock;
+use Spark\Facades\Mail;
+use Spark\Facades\Route;
+```
 
-Available facade classes include:
-
-- `App`
-- `Auth`
-- `Blade`
-- `Cache`
-- `DB`
-- `Event`
-- `Gate`
-- `Hash`
-- `Http`
-- `Lock`
-- `Log`
-- `Mail`
-- `Route`
-
-Use facades when the framework style already uses them. In lower-level classes, direct dependency/container resolution is often clearer.
-
-## Helpers
-
-Helpers are globally loaded from `src/Foundation/helpers.php`.
-
-Important helpers:
-
-- Container: `app`, `get`, `has`, `bind`, `singleton`, `call`
-- Request/response: `request`, `response`, `json`, `redirect`, `to_route`, `back`
-- Routing: `router`, `route_url`, `route`
-- Database: `database`, `db`, `query`, `connect_db`
-- Views: `view`, `blade`, `fireline`
-- URL/assets: `url`, `home_url`, `asset_url`, `asset`, `media_url`, `media`, `request_url`
-- Paths: `root_dir`, `resource_dir`, `app_dir`, `storage_dir`, `lang_dir`, `upload_dir`, `views_dir`, `temp_dir`, `dir_path`
-- Config/env: `config`, `env`, `envs`, `env_parse_value`, `normalize_env_numeric_value`, `env_string_value`
-- Auth/gate: `auth`, `user`, `is_guest`, `is_logged`, `can`, `canAny`, `cannot`, `authorize`, `gate`
-- CSRF: `csrf_token`, `csrf`, `method`
-- Events/jobs: `event`, `job`, `dispatch`
-- Cache/lock: `cache`, `unload_cache`, `lock`
-- I18n: `__`, `_e`
-- Frontend: `vite`
-- Validation/input: `input`, `validator`, `errors`, `old`
-- Utilities: `cookie`, `mailer`, `abort`, `hashing`, `hasher`, `passcode`, `bcrypt`, `encrypt`, `decrypt`, `http`, `image`, `paginator`, `uploader`, `now`, `carbon`, `filemanager`, `fm`, `arr_from_set`, `tracer`, `is_cli`, `is_web`, `is_debug_mode`, `tracer_log`, `pipeline`, `concurrency`
-
-Path rule:
-
-- Use `storage_dir()` for app storage paths.
-- Use `dir_path()` to normalize paths.
-- Do not assume missing legacy helpers exist.
+Facades resolve services from the application container. Use them only if the app already uses facade style or it improves clarity.
 
 ## Error Handling
 
-`abort($error, $message = null, $code = null)` renders framework error responses.
+Use:
 
-Common exception mapping in `Application::run()`:
+```php
+abort(404, 'Post not found');
+abort(403, 'Forbidden');
+```
 
-- `RouteNotFoundException` -> 404
-- `ItemNotFoundException` -> 404
-- `NotFoundException` -> 404
-- `AuthorizationException` -> 403
-- `InvalidCsrfTokenException` -> 419
-- `TooManyRequests` -> 429
+Framework mappings:
 
-Unhandled exceptions go to `Tracer`.
+- route not found -> 404
+- not found/item not found -> 404
+- authorization failure -> 403
+- invalid CSRF -> 419
+- too many requests -> 429
 
-## Coding Conventions for This Framework
+Register custom exception handlers with `withExceptions()` if the app uses that style.
 
-Follow these rules when modifying TinyCore:
+## Common Feature Recipe
 
-1. Prefer existing framework patterns over Laravel assumptions.
-2. Do not edit `src/Support` unless explicitly requested.
-3. Keep helper APIs stable and avoid adding broad global helpers unless necessary.
-4. Use the container and config system consistently.
-5. For cache, lock, and queue, use current config shapes:
-   - cache/lock -> `config('cache')`
-   - queue -> `config('queue')`
-   - database -> `config('database')`
-6. Preserve sqlite and redis parity for cache, lock, and queue changes.
-7. For request lifecycle changes, check all of:
-   - `Application`
-   - `Router`
-   - `Middleware`
-   - `Request`
-   - `Response`
-   - built-in middleware
-8. For model/database changes, check:
-   - `Model`
-   - `QueryBuilder`
-   - `DB`
-   - casts
-   - schema grammar when SQL changes are involved
-9. Avoid destructive git operations. This repo may have staged and unstaged user work.
-10. Run `php -l` on touched PHP files.
-11. Run focused smoke tests with `php -r` when practical.
-12. Run `git diff --check` before finalizing.
+For a new API resource:
 
-## Current Production-Sensitive Behavior to Preserve
+1. Create migration in `database/migrations`.
+2. Create model in `app/Models`.
+3. Create request class in `app/Http/Requests` if validation is more than trivial.
+4. Create controller in `app/Http/Controllers/Api`.
+5. Add routes in `routes/api.php`.
+6. Add middleware only if needed.
+7. Return arrays or `json()` responses for APIs.
+8. Use model/query builder APIs, not raw SQL.
 
-Request lifecycle:
+Example:
 
-- Middleware wraps route responses, not just early returns.
-- CORS preflight must not run non-OPTIONS route callbacks.
-- Explicit `OPTIONS` routes must still work.
-- `HEAD` should match `GET`.
-- Router should allow optional trailing slash.
+```php
+// routes/api.php
+use App\Http\Controllers\Api\PostController;
 
-CORS:
+Route::get('/posts', [PostController::class, 'index']);
+Route::post('/posts', [PostController::class, 'store']);
+Route::get('/posts/{id}', [PostController::class, 'show']);
+Route::put('/posts/{id}', [PostController::class, 'update']);
+Route::delete('/posts/{id}', [PostController::class, 'destroy']);
+```
 
+## Common Mistakes To Avoid
+
+- Do not use Laravel `Route::get()` unless the app has explicitly aliased it. Prefer `route()->get()`.
+- Do not import `Illuminate\\*` classes.
+- Do not create Laravel `FormRequest`, `Middleware`, `Migration`, or `Model` classes.
+- Do not use `artisan`; TinyMVC has its own console command system.
+- Do not assume Eloquent relationship syntax is identical. Inspect existing models.
+- Do not edit framework/vendor files in an app unless asked.
+- Do not bypass config with hardcoded storage paths.
+- Do not use raw `$_POST`/`$_GET` in controllers when `Request` helpers are available.
+- Do not run non-OPTIONS controller logic for CORS preflight.
 - Do not send `Access-Control-Allow-Credentials: false`.
-- Do not send preflight-only headers on normal responses.
-- Validate requested method and requested headers on preflight.
-- Wildcard origin patterns must use escaped wildcard replacement correctly.
+- Do not mix queue config with cache config.
 
-Config:
+## Verification Checklist For AI Agents
 
-- Config cache must refresh when `.env` changes.
-- Config cache should include config file mtimes and env signature.
+Before finishing changes in a TinyMVC app:
 
-Model timestamps:
+1. Run `php -l` on every changed PHP file.
+2. Check route/controller namespaces match the app.
+3. Check middleware aliases exist in `bootstrap/middlewares.php`.
+4. Check config keys match this file.
+5. If changing DB code, verify migration/model/table names.
+6. If changing CORS/CSRF/throttle, test normal request and preflight/invalid cases when possible.
+7. If changing queue/cache/lock, test sqlite default and consider redis parity.
+8. Run `git diff --check`.
+9. Mention anything not tested.
 
-- Timestamp-enabled models should parse `created_at` and `updated_at` as datetime-like values by default, while respecting explicit model casts.
+## Minimal Mental Model
 
-Queue:
+TinyMVC request flow:
 
-- `pushOnce()` must be consistent for sqlite and redis.
-- Repeated jobs should be safe for scheduler/cron registration.
-
-Throttle:
-
-- Parameters are `attempts, minutes, suffix`.
-- Storage uses `Cache`, so it follows cache driver config.
-
-## Suggested Verification Commands
-
-Syntax:
-
-```sh
-php -l src/Foundation/Application.php
-php -l src/Routing/Router.php
-php -l src/Http/Middleware.php
-php -l src/Foundation/Http/Middlewares/CorsAccessControl.php
-php -l src/Foundation/Http/Middlewares/CsrfProtection.php
-php -l src/Foundation/Http/Middlewares/ThrottleIncomingRequests.php
+```text
+public/index.php
+  -> bootstrap/app.php
+  -> Application
+  -> DotEnv and config cache
+  -> providers
+  -> Request
+  -> Router
+  -> Middleware pipeline
+  -> controller/callback
+  -> Response
 ```
 
-Diff hygiene:
-
-```sh
-git diff --check
-git diff --cached --check
-```
-
-Search:
-
-```sh
-rg "pattern" src -g '!src/Support/**'
-rg --files -g '!src/Support/**'
-```
-
-## AI Agent Checklist Before Editing
-
-Before changing code:
-
-1. Read the target file and its neighboring lifecycle files.
-2. Search for existing usage with `rg`.
-3. Identify whether the change affects public API, config shape, lifecycle behavior, storage drivers, or helper behavior.
-4. Avoid touching staged/unrelated user work.
-
-Before final response:
-
-1. Run `php -l` on changed PHP files.
-2. Run a focused runtime smoke test if behavior changed.
-3. Run `git diff --check`.
-4. Summarize changed files and verification.
-5. Mention anything not tested.
-
+Use `Spark\\` classes, app namespaces, and the helpers in this file. When unsure, inspect nearby app files and follow the existing TinyMVC pattern.

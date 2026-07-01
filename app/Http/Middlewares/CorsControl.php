@@ -31,7 +31,7 @@ class CorsControl extends CORS
          *
          * @var array
          */
-        'headers' => ['Content-Type', 'Authorization', 'X-Requested-With'],
+        'headers' => ['Content-Type', 'Authorization', 'X-Requested-With', 'X-XSRF-TOKEN'],
 
         /**
          * Whether the request includes user credentials.
