@@ -87,6 +87,8 @@ Cache, lock, queue, and redis:
 - Lock: `./vendor/tinymvc/tinycore/src/Utils/Lock.php`
 - Queue: `./vendor/tinymvc/tinycore/src/Queue/Queue.php`
 - Job wrapper: `./vendor/tinymvc/tinycore/src/Queue/Job.php`
+- Class job dispatch trait: `./vendor/tinymvc/tinycore/src/Queue/Dispatchable.php`
+- Fluent pending dispatch: `./vendor/tinymvc/tinycore/src/Queue/PendingDispatch.php`
 - Job contracts: `./vendor/tinymvc/tinycore/src/Queue/Contracts/`
 - Redis connector: `./vendor/tinymvc/tinycore/src/Utils/RedisConnector.php`
 
@@ -118,6 +120,20 @@ When implementing a feature in a TinyMVC app:
 4. Use `Spark\\` classes, TinyMVC helpers, and the app's own base classes.
 5. Do not edit `vendor/tinymvc/tinycore` or framework source unless the user explicitly asks to modify the framework itself.
 6. Do not create Laravel-specific files or syntax unless this app already provides compatibility.
+
+## AI Agent Decision Rules
+
+Use this file as the framework contract for app code. When exact behavior matters, inspect the source lookup paths above, but treat `vendor/tinymvc/tinycore` as read-only in application projects.
+
+Prefer these choices:
+
+- Routes: use `Spark\Facades\Route` when the app imports it, otherwise use `router()`.
+- Controllers: return arrays for JSON APIs, `json()` for explicit status codes, and `response()` for plain responses.
+- Validation: use `Spark\Foundation\Http\FormRequest` for reusable request validation, or `$request->validate()` for simple cases.
+- Database: use `Spark\Database\Model` or `query($table)` before raw SQL.
+- Background work: use class jobs with `Spark\Queue\Dispatchable`; use `dispatchOnce()` for recurring scheduler/cron jobs.
+- Paths: use config and helpers such as `storage_dir()`, `root_dir()`, `upload_dir()`, and `views_dir()`.
+- Framework uncertainty: inspect the matching source file under `./vendor/tinymvc/tinycore/src/...` before guessing Laravel behavior.
 
 ## Typical Application Layout
 
@@ -988,32 +1004,79 @@ Lock driver follows cache config.
 
 ## Queue and Jobs
 
-Jobs may implement `Spark\Queue\Contracts\JobInterface`.
+Prefer class jobs for application work. A class job implements `Spark\Queue\Contracts\JobInterface` and usually uses `Spark\Queue\Dispatchable`.
 
 ```php
 <?php
 
 namespace App\Jobs;
 
+use Spark\Queue\Contracts\JobContract;
 use Spark\Queue\Contracts\JobInterface;
+use Spark\Queue\Dispatchable;
+use Throwable;
 
 class SendWelcomeEmail implements JobInterface
 {
+    use Dispatchable;
+
+    public function __construct(private int $userId)
+    {
+    }
+
     public function handle(): void
     {
         // send email
     }
+
+    public function failed(JobContract $job, Throwable $exception): void
+    {
+        // called only after the queue exhausts all tries
+    }
 }
 ```
 
-Dispatch:
+Class job dispatch:
+
+```php
+use App\Jobs\SendWelcomeEmail;
+use App\Jobs\SyncReports;
+
+SendWelcomeEmail::dispatch($userId)->onQueue('emails');
+SendWelcomeEmail::dispatch($userId)->onQueue('emails')->delay(60);
+
+SyncReports::dispatchOnce()
+    ->onQueue('reports')
+    ->repeatEveryMinutes(5);
+```
+
+`Dispatchable::dispatch(...$arguments)` passes arguments to the job constructor. The queue worker later calls `handle()` through the application container.
+
+The fluent dispatch object supports:
+
+- `onQueue('name')`
+- `once()` for duplicate-safe push behavior
+- `delay($seconds)`
+- `schedule($time)`
+- `repeat($intervalOrAlias)`
+- `repeatEveryMinutes($minutes)`
+- `repeatHourly()`, `repeatDaily()`, `repeatWeekly()`, `repeatMonthly()`
+- `send()` or `dispatch()` to push immediately
+
+The pending dispatch is also pushed automatically when the fluent expression falls out of scope, so this is valid:
+
+```php
+SendWelcomeEmail::dispatch($userId)->onQueue('emails');
+```
+
+The older job wrapper API is still valid and useful in `bootstrap/app.php`:
 
 ```php
 job(App\Jobs\SendWelcomeEmail::class)->dispatch('emails');
 job(App\Jobs\SyncReports::class)->repeatEveryMinutes(5)->dispatchOnce('reports');
 ```
 
-In `bootstrap/app.php`, recurring jobs should be registered with `withQueue()` and `pushOnce()` behavior:
+In `bootstrap/app.php`, recurring jobs should be registered with `withQueue()` so they use queue `pushOnce()` behavior and do not duplicate every bootstrap:
 
 ```php
 ->withQueue(
@@ -1024,11 +1087,33 @@ In `bootstrap/app.php`, recurring jobs should be registered with `withQueue()` a
 )
 ```
 
+Repeat constants live on `Spark\Queue\Job`:
+
+```php
+use Spark\Queue\Job;
+
+job(App\Jobs\SyncReports::class)->repeat(Job::REPEAT_DAILY);
+job(App\Jobs\SyncReports::class)->repeat('weekly'); // alias for Job::REPEAT_WEEKLY
+```
+
+Supported repeat aliases:
+
+- `hourly` -> `Job::REPEAT_HOURLY`
+- `daily` -> `Job::REPEAT_DAILY`
+- `weekly` -> `Job::REPEAT_WEEKLY`
+- `biweekly` -> `Job::REPEAT_BIWEEKLY`
+- `monthly` -> `Job::REPEAT_MONTHLY`
+- `quarterly` -> `Job::REPEAT_QUARTERLY`
+- `yearly` -> `Job::REPEAT_YEARLY`
+
 Queue driver is configured by `config('queue.driver')`.
 
 Important:
 
 - Use `dispatchOnce()` or `withQueue(jobs: [...])` for scheduler/cron-style repeated jobs.
+- Job `failed()` hooks are called by `Queue` only after all tries are exhausted, not on every retryable exception.
+- A `failed()` method may accept either `Throwable $exception` or `JobContract $job, Throwable $exception`.
+- Queue connection/driver comes from `config('queue')`; do not invent Laravel-style `onConnection()` usage.
 - Queue has separate config from cache.
 - Redis and sqlite drivers should behave consistently for push/pushOnce/work.
 
@@ -1209,6 +1294,7 @@ Example:
 ```php
 // routes/api.php
 use App\Http\Controllers\Api\PostController;
+use Spark\Facades\Route;
 
 Route::get('/posts', [PostController::class, 'index']);
 Route::post('/posts', [PostController::class, 'store']);
@@ -1219,7 +1305,7 @@ Route::delete('/posts/{id}', [PostController::class, 'destroy']);
 
 ## Common Mistakes To Avoid
 
-- Do not use Laravel `Route::get()` unless the app has explicitly aliased it. Prefer `route()->get()`.
+- Do not import Laravel's route facade. Use `Spark\Facades\Route` or `router()` depending on the app style.
 - Do not import `Illuminate\\*` classes.
 - Do not create Laravel `FormRequest`, `Middleware`, `Migration`, or `Model` classes.
 - Do not use `artisan`; TinyMVC has its own console command system.
@@ -1230,6 +1316,7 @@ Route::delete('/posts/{id}', [PostController::class, 'destroy']);
 - Do not run non-OPTIONS controller logic for CORS preflight.
 - Do not send `Access-Control-Allow-Credentials: false`.
 - Do not mix queue config with cache config.
+- Do not use Laravel queue APIs such as `onConnection()` unless the app has added its own compatibility layer.
 
 ## Verification Checklist For AI Agents
 
