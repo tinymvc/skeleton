@@ -83,9 +83,12 @@ Database, ORM, and migrations:
 
 Cache, lock, queue, and redis:
 
-- Cache: `./vendor/tinymvc/tinycore/src/Utils/Cache.php`
-- Lock: `./vendor/tinymvc/tinycore/src/Utils/Lock.php`
+- Cache: `./vendor/tinymvc/tinycore/src/Cache/Cache.php`
+- Lock: `./vendor/tinymvc/tinycore/src/Cache/Lock.php`
+- Cache and lock contracts: `./vendor/tinymvc/tinycore/src/Cache/Contracts/`
+- Cache storage drivers: `./vendor/tinymvc/tinycore/src/Cache/Storage/`
 - Queue: `./vendor/tinymvc/tinycore/src/Queue/Queue.php`
+- Queue storage drivers: `./vendor/tinymvc/tinycore/src/Queue/Storage/`
 - Job wrapper: `./vendor/tinymvc/tinycore/src/Queue/Job.php`
 - Class job dispatch trait: `./vendor/tinymvc/tinycore/src/Queue/Dispatchable.php`
 - Fluent pending dispatch: `./vendor/tinymvc/tinycore/src/Queue/PendingDispatch.php`
@@ -103,11 +106,11 @@ Views, console, events, facades, utilities:
 - Event dispatcher: `./vendor/tinymvc/tinycore/src/Events.php`
 - Facade base class: `./vendor/tinymvc/tinycore/src/Facades/Facade.php`
 - All facades: `./vendor/tinymvc/tinycore/src/Facades/`
-- Carbon-like date utility: `./vendor/tinymvc/tinycore/src/Utils/Carbon.php`
+- Carbon-like date utility: `./vendor/tinymvc/tinycore/src/Carbon.php`
 - Mail utility: `./vendor/tinymvc/tinycore/src/Utils/Mail.php`
 - HTTP client: `./vendor/tinymvc/tinycore/src/Http/Client/`
 - Upload/file/image utilities: `./vendor/tinymvc/tinycore/src/Utils/Uploader.php`, `./vendor/tinymvc/tinycore/src/Utils/FileManager.php`, `./vendor/tinymvc/tinycore/src/Utils/Image.php`
-- Tracer/debugging: `./vendor/tinymvc/tinycore/src/Utils/Tracer.php`
+- Tracer/debugging: `./vendor/tinymvc/tinycore/src/Tracer.php`
 - Vite integration: `./vendor/tinymvc/tinycore/src/Utils/Vite.php`
 
 ## How To Use This File
@@ -1020,6 +1023,10 @@ class SendWelcomeEmail implements JobInterface
 {
     use Dispatchable;
 
+    public int $tries = 3;
+
+    public array $backoff = [120, 300];
+
     public function __construct(private int $userId)
     {
     }
@@ -1051,6 +1058,33 @@ SyncReports::dispatchOnce()
 ```
 
 `Dispatchable::dispatch(...$arguments)` passes arguments to the job constructor. The queue worker later calls `handle()` through the application container.
+
+Per-job retry policy can override the worker defaults:
+
+```php
+class SyncReports implements JobInterface
+{
+    use Dispatchable;
+
+    public int $tries = 5;
+
+    public array $backoff = [60, 300, 900];
+
+    public function handle(): void
+    {
+        // sync reports
+    }
+}
+```
+
+Retry policy notes:
+
+- `$tries` overrides the `Queue::work(tries: ...)` value for that job.
+- `$backoff` overrides the `Queue::work(delay: ...)` value for retry scheduling.
+- `$backoff` values are seconds.
+- Array backoff is selected by failed attempt number; extra attempts reuse the last value.
+- Use lowercase `$backoff`, not `$backOff`.
+- Invalid or missing values fall back to the worker defaults.
 
 The fluent dispatch object supports:
 
@@ -1111,6 +1145,7 @@ Queue driver is configured by `config('queue.driver')`.
 Important:
 
 - Use `dispatchOnce()` or `withQueue(jobs: [...])` for scheduler/cron-style repeated jobs.
+- Public job properties `$tries` and `$backoff` override worker retry defaults when present.
 - Job `failed()` hooks are called by `Queue` only after all tries are exhausted, not on every retryable exception.
 - A `failed()` method may accept either `Throwable $exception` or `JobContract $job, Throwable $exception`.
 - Queue connection/driver comes from `config('queue')`; do not invent Laravel-style `onConnection()` usage.
