@@ -911,7 +911,7 @@ Useful blueprint methods:
 - `boolean`, `enum`, `json`
 - `date`, `dateTime`, `time`, `timestamp`
 - `timestamps`, `nullableTimestamps`, `softDeletes`, `rememberToken`
-- `foreignId`, `nullableForeignId`, `foreign`, `constrained`
+- `foreignId`, `foreign`, `constrained`
 - `primary`, `unique`, `index`, `fullText`, `spatialIndex`
 - `dropColumn`, `dropIndex`, `dropForeign`, `renameColumn`
 
@@ -922,6 +922,7 @@ $table->string('email')->unique();
 $table->text('body')->nullable();
 $table->boolean('active')->default(true);
 $table->timestamp('published_at')->nullable();
+$table->foreignId('user_id', nullable: true)->constrained()->nullOnDelete(); // default: nullable=false
 ```
 
 ## Auth and Authorization
