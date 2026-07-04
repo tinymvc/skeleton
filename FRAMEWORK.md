@@ -33,6 +33,7 @@ If an AI needs exact behavior, it should inspect these files as read-only refere
 Core bootstrap and container:
 
 - Application lifecycle: `./vendor/tinymvc/tinycore/src/Foundation/Application.php`
+- Application contract: `./vendor/tinymvc/tinycore/src/Contracts/ApplicationContract.php`
 - Service container and dependency injection: `./vendor/tinymvc/tinycore/src/Container.php`
 - Service provider base class: `./vendor/tinymvc/tinycore/src/Foundation/Providers/ServiceProvider.php`
 - Core console provider: `./vendor/tinymvc/tinycore/src/Foundation/Providers/ConsoleServiceProvider.php`
@@ -222,6 +223,29 @@ Important lifecycle:
 8. Route callback/controller returns a value.
 9. Router converts it to `Response`.
 10. `Response::send()` sends headers and body.
+11. `Application::terminate()` finishes the client response and runs callbacks registered with `defer()`.
+
+Post-response work:
+
+```php
+defer(function () use ($userId) {
+    app(App\Services\Analytics::class)->trackSignup($userId);
+});
+
+app()->defer(function (App\Services\AuditLog $audit) use ($order) {
+    $audit->recordOrderViewed($order->id);
+});
+```
+
+Use `defer()` for small post-response tasks such as audit logging, analytics, cleanup, or lightweight notifications. Deferred callbacks are invoked through the container, so type-hinted dependencies can be injected. They run after the response is sent, in registration order. A deferred callback may register another deferred callback; it will run in the same termination cycle after the callbacks that were already in the queue.
+
+Important defer notes:
+
+- Deferred callbacks are not a replacement for durable queues; use Queue jobs for work that must survive process crashes, timeouts, or worker restarts.
+- `Application::terminate()` calls `fastcgi_finish_request()` or `litespeed_finish_request()` when available, otherwise it flushes output buffers.
+- `defer()` registers a shutdown fallback so callbacks can still run when code sends a response and exits early.
+- Exceptions thrown by deferred callbacks are reported/logged and do not stop later deferred callbacks.
+- In debug mode, `app:terminated` is dispatched during application termination.
 
 ## Configuration
 
@@ -323,6 +347,7 @@ response('OK', 200);
 json(['ok' => true]);
 redirect('/login');
 back();
+defer(fn() => tracer_log('response_sent'));
 
 router();
 route_url('users.show', ['id' => 5]);
@@ -348,6 +373,7 @@ dir_path($path);
 now();
 carbon('2026-01-01');
 abort(404, 'Not found');
+tracer_log('message');
 ```
 
 Use helpers only when they already match the app style. In service classes, dependency injection is often cleaner.
@@ -1117,10 +1143,11 @@ In `bootstrap/app.php`, recurring jobs should be registered with `withQueue()` s
 ->withQueue(
     jobs: [
         job(App\Jobs\SyncReports::class)->repeatEveryMinutes(5),
-    ],
-    log: true
+    ]
 )
 ```
+
+`withQueue()` accepts `jobs` and an optional `then` callback. Queue logging options were removed from the public queue API; do not pass `log: true`, call `Queue::logging()`, or depend on `storage/logs/queue.log`.
 
 Repeat constants live on `Spark\Queue\Job`:
 
@@ -1219,6 +1246,8 @@ http();
 HTTP client classes live under `Spark\Http\Client`.
 
 Mail utility depends on optional `phpmailer/phpmailer`.
+
+The Mail utility no longer exposes framework-specific logging methods. Use normal exception handling, `tracer_log()`, or your app logger around mail sending if mail activity needs to be recorded.
 
 ## Service Providers
 
