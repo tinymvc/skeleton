@@ -13,7 +13,7 @@ TinyMVC is a small PHP framework powered by the TinyCore package.
 - Minimum PHP: `8.2`
 - Style: Laravel-like ergonomics, custom implementation
 - Dependency injection: `Spark\Foundation\Application` extends `Spark\Container`
-- Routing: `Spark\Routing\Router`
+- Routing: `Spark\Http\Routing\Router`
 - HTTP: `Spark\Http\Request`, `Spark\Http\Response`, `Spark\Http\Middleware`
 - Database: PDO wrapper, query builder, active-record-like models, schema/migrations
 - Storage utilities: sqlite or redis cache, lock, and queue
