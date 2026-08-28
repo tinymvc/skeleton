@@ -7,7 +7,8 @@ use Spark\Database\Model;
 class User extends Model
 {
     protected array $fillable = [
-        'name',
+        'first_name',
+        'last_name',
         'username',
         'email',
         'password',

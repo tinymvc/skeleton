@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => ({
   root: path.resolve(__dirname, "./resources/app"),
   server: {
     strictPort: true,
-    port: 5133,
+    port: 5173,
   },
   build: {
     outDir: path.resolve(__dirname, "./public/build"),

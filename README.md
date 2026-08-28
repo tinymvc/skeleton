@@ -5,7 +5,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/tinymvc/skeleton?style=flat-square)](https://github.com/tinymvc/skeleton/stargazers)
 [![Open Issues](https://img.shields.io/github/issues-raw/tinymvc/skeleton?style=flat-square)](https://github.com/tinymvc/issues)
 
-**A minimalist MVC PHP framework for modern web artisans**  
+**A minimalist PHP MVC framework for modern web artisans**  
 Lightning-fast · Elegant Syntax · Developer Friendly
 
 ## Key Features

@@ -8,7 +8,8 @@ return new class {
         User::firstOrCreate(
             attributes: ['email' => 'admin@mail.com'],
             values: [
-                'name' => 'Super Admin',
+                'first_name' => 'John',
+                'last_name' => ' Doe',
                 'username' => 'admin',
                 'password' => bcrypt('password'),
             ]

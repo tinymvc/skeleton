@@ -157,6 +157,7 @@ bootstrap/
   app.php
   middlewares.php
   providers.php
+  helpers.php
 config/
   app.php
   cache.php
