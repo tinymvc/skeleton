@@ -70,3 +70,9 @@ We welcome contributions! Please:
 ## License
 
 TinyMVC is open-source software licensed under the [MIT License](https://github.com/tinymvc/skeleton/blob/main/LICENSE).
+
+## Testing
+
+Run `composer test` or `php tests/run.php` after `composer install`.
+The plain PHP runner has no extra dependencies. See [TESTING.md](TESTING.md)
+for unit tests, feature tests, and test configuration.

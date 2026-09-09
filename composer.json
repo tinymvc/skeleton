@@ -36,9 +36,15 @@
         ],
         "post-create-project-cmd": [
             "@php spark key:generate"
-        ]
+        ],
+        "test": "@php tests/run.php"
     },
     "config": {
         "optimize-autoloader": true
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
     }
 }

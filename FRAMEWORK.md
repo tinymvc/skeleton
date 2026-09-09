@@ -1384,6 +1384,48 @@ Route::delete('/posts/{id}', [PostController::class, 'destroy']);
 - Do not mix queue config with cache config.
 - Do not use Laravel queue APIs such as `onConnection()` unless the app has added its own compatibility layer.
 
+## Testing
+
+TinyMVC includes a dependency-free plain PHP runner. Run `php tests/run.php` or
+`composer test`. Options: `--testsuite Unit|Feature`, `--filter text`, and
+`--list-tests`; pass options to Composer after `--`.
+
+- Unit tests: `tests/Unit/*Test.php`, extending `Spark\Testing\TestCase`.
+- Application feature tests: `tests/Feature/*Test.php`, extending `Tests\TestCase`.
+- Feature lifecycle: `Spark\Testing\ApplicationTestCase` creates a fresh app.
+- Response assertions: `Spark\Testing\TestResponse` wraps `Spark\Http\Response`.
+- Bootstrap and test config: `tests/bootstrap.php` and `tests/config.php`.
+
+Tests are public non-static `test*` methods without arguments. Use strict
+assertions such as `assertSame`, `assertTrue`, `assertCount`, and `assertArrayHasKey`.
+The runner supports setup/teardown, expected exception class/message/code,
+`assertThrows`, and explicit `markTestSkipped`. Failures, warnings,
+and empty test selections produce non-zero exits.
+
+Feature helpers include `get`, `post`, `getJson`, `postJson`, and
+`request($method, $uri, $data, $headers, json: true)`. Responses support
+`assertOk`, `assertStatus`, `assertSee`, `assertHeader`, `assertRedirect`, and
+`assertJson` (complete JSON equality with strict types), `assertJsonPath`,
+`assertJsonFragment`, `assertJsonStructure`, `assertJsonCount`, and
+`assertJsonValidationErrors`. Common HTTP verbs also have named helpers, including
+`put`, `patch`, `delete`, `options`, `head`, `putJson`, `patchJson`, and `deleteJson`.
+Use `withHeaders`, `withToken`, `withSession`, `withCookies`, and `actingAs` for
+request state. `assertDatabaseHas`, `assertDatabaseMissing`, and
+`assertDatabaseCount` inspect the configured test database. TinyCore itself ships
+only `src/Testing/`; application tests live in the skeleton's `tests/`.
+
+`APP_ENV=testing` must be set before creating a CLI application. In that mode,
+`.env` and config caches are skipped; `Application::create()` merges
+`tests/config.php` before provider registration. The feature base supplies a
+temporary storage path; the supplied config uses in-memory SQLite. Middleware,
+including CSRF, remains active. Unexpected exceptions reach the runner; early
+responses, redirects, aborts, and validation errors are captured. Deferred work
+runs after each successful request without flushing the runner's buffers.
+
+Do not add PHPUnit, Pest, Laravel testing traits, or other testing packages.
+Use the built-in assertions and small PHP stub objects. See [TESTING.md](TESTING.md)
+for examples, configuration, and limits.
+
 ## Verification Checklist For AI Agents
 
 Before finishing changes in a TinyMVC app:
@@ -1396,7 +1438,8 @@ Before finishing changes in a TinyMVC app:
 6. If changing CORS/CSRF/throttle, test normal request and preflight/invalid cases when possible.
 7. If changing queue/cache/lock, test sqlite default and consider redis parity.
 8. Run `git diff --check`.
-9. Mention anything not tested.
+9. Run `composer test` when the project has a test suite.
+10. Mention anything not tested.
 
 ## Minimal Mental Model
 
