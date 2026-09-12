@@ -96,7 +96,7 @@ Cache, lock, queue, and redis:
 - Job contracts: `./vendor/tinymvc/tinycore/src/Queue/Contracts/`
 - Redis connector: `./vendor/tinymvc/tinycore/src/Utils/RedisConnector.php`
 
-Views, console, events, facades, utilities:
+Views, console, events, facades, utilities, testing:
 
 - Blade renderer: `./vendor/tinymvc/tinycore/src/View/Blade.php`
 - Blade compiler: `./vendor/tinymvc/tinycore/src/View/BladeCompiler.php`
@@ -113,6 +113,7 @@ Views, console, events, facades, utilities:
 - Upload/file/image utilities: `./vendor/tinymvc/tinycore/src/Utils/Uploader.php`, `./vendor/tinymvc/tinycore/src/Utils/FileManager.php`, `./vendor/tinymvc/tinycore/src/Utils/Image.php`
 - Tracer/debugging: `./vendor/tinymvc/tinycore/src/Tracer.php`
 - Vite integration: `./vendor/tinymvc/tinycore/src/Utils/Vite.php`
+- Unit/Feature Testing: `vendor/tinymvc/tinycore/src/Testing/ApplicationTestCase.php`, `vendor/tinymvc/tinycore/src/Testing/Assert.php`, `vendor/tinymvc/tinycore/src/Testing/TestCase.php`
 
 ## How To Use This File
 
@@ -1386,7 +1387,7 @@ Route::delete('/posts/{id}', [PostController::class, 'destroy']);
 
 ## Testing
 
-TinyMVC includes a dependency-free plain PHP runner. Run `php tests/run.php` or
+TinyMVC includes a dependency-free plain PHP runner. Run `php test` or
 `composer test`. Options: `--testsuite Unit|Feature`, `--filter text`, and
 `--list-tests`; pass options to Composer after `--`.
 
@@ -1423,8 +1424,7 @@ responses, redirects, aborts, and validation errors are captured. Deferred work
 runs after each successful request without flushing the runner's buffers.
 
 Do not add PHPUnit, Pest, Laravel testing traits, or other testing packages.
-Use the built-in assertions and small PHP stub objects. See [TESTING.md](TESTING.md)
-for examples, configuration, and limits.
+Use the built-in assertions and small PHP stub objects.
 
 ## Verification Checklist For AI Agents
 

@@ -10,9 +10,9 @@ return new class {
             $table->id();
             $table->string('first_name')->nullable();
             $table->string('last_name')->nullable();
-            $table->string('username')->unique()->required();
-            $table->string('email')->unique()->required();
-            $table->string('password', 255)->required();
+            $table->string('username')->unique();
+            $table->string('email')->unique();
+            $table->string('password', 255);
             $table->string('remember_token', 200)->nullable();
             $table->timestamps();
         });

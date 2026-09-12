@@ -16,7 +16,7 @@
     ],
     "autoload": {
         "psr-4": {
-            "App\\": "./app"
+            "App\\": "app/"
         }
     },
     "suggest": {
@@ -37,7 +37,7 @@
         "post-create-project-cmd": [
             "@php spark key:generate"
         ],
-        "test": "@php tests/run.php"
+        "test": "@php test"
     },
     "config": {
         "optimize-autoloader": true
