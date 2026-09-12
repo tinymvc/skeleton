@@ -1,5 +1,25 @@
 <?php
 
-require __DIR__ . '/bootstrap.php';
+/**
+ * Run all tests in the skeleton/tests directory.
+ *
+ * Usage:
+ *   php tests/run.php
+ */
 
-exit((new \Spark\Testing\Runner())->run(__DIR__, array_slice($argv, 1)));
+$autoload = dirname(__DIR__) . '/vendor/autoload.php';
+
+if (!is_file($autoload)) {
+    fwrite(STDERR, "Run composer install before running tests.\n");
+    exit(2);
+}
+
+require $autoload;
+
+// Applied before application creation; .env and compiled config stay untouched.
+$_ENV['APP_ENV'] = 'testing';
+
+$runner = new \Spark\Testing\Runner();
+$result = $runner->run(__DIR__, array_slice($argv, 1));
+
+exit($result);

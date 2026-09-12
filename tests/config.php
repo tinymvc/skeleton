@@ -9,12 +9,12 @@ if (!$storage) {
 return [
     'app' => [
         'debug' => false,
-        'key' => 'testing-only-key-do-not-use-in-production',
+        'key' => '70e313f57a932c7388cae00b80a11912',
         'timezone' => 'UTC',
-        'url' => 'http://localhost',
+        'url' => 'http://localhost:8080',
         'storage_dir' => $storage,
-        'temp_dir' => $storage . '/temp',
-        'upload_dir' => $storage . '/uploads',
+        'temp_dir' => "$storage/temp",
+        'upload_dir' => "$storage/uploads",
     ],
     'database' => [
         'driver' => 'sqlite',
@@ -22,10 +22,10 @@ return [
     ],
     'cache' => [
         'driver' => 'sqlite',
-        'connections' => ['sqlite' => ['path' => $storage . '/cache']],
+        'connections' => ['sqlite' => ['path' => "$storage/cache"]],
     ],
     'queue' => [
         'driver' => 'sqlite',
-        'connections' => ['sqlite' => ['path' => $storage . '/queue/jobs.db']],
+        'connections' => ['sqlite' => ['path' => "$storage/queue/jobs.db"]],
     ],
 ];

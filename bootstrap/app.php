@@ -14,16 +14,8 @@ use Spark\Foundation\Application;
  *
  * @param string $path
  *   The root directory path of the application.
- * @param string $config
- *   Discover and load configuration files from the specified path.
- * @param string $providers
- *   Register service providers from the specified path.
  */
-return Application::create(
-    path: dirname(__DIR__),
-    config: 'config',
-    providers: require __DIR__ . '/providers.php'
-)
+return Application::create(path: dirname(__DIR__))
     /**
      * Register middleware in the application.
      *
