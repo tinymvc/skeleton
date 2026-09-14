@@ -11,8 +11,12 @@
 
 define('APP_START', microtime(true));
 
-// Load the Composer autoloader for the application
-require dirname(__DIR__) . '/vendor/autoload.php';
+// Check if the Composer autoloader exists; if not, prompt the user to run composer install.
+if (!is_file($autoload = dirname(__DIR__) . '/vendor/autoload.php')) {
+    die("Run composer install before running the application.");
+}
+
+require $autoload; // Load the Composer autoloader for the application
 
 /**
  * Runs the bootstrap process.

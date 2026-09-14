@@ -1,8 +1,13 @@
 #!/usr/bin/env php
 <?php
 
-// Load the composer autoloader
-require __DIR__ . '/vendor/autoload.php';
+// Check if the Composer autoloader exists; if not, prompt the user to run composer install.
+if (!is_file($autoload = __DIR__ . '/vendor/autoload.php')) {
+    fwrite(STDERR, "Run composer install before running the application.\n");
+    exit(2);
+}
+
+require $autoload; // Load the Composer autoloader for the application
 
 use Spark\Foundation\Providers\ConsoleServiceProvider as SparkConsoleServiceProvider;
 use App\Providers\ConsoleServiceProvider as AppConsoleServiceProvider;

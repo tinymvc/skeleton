@@ -1,10 +1,13 @@
 <?php
 
 /**
- * Run all tests in the skeleton/tests directory.
+ * Run all tests in the project/tests directory.
  *
  * Usage:
- *   php tests/run.php
+ *   Run: php test
+ *   Flags: --filter=SomeTestClass
+ *          --testsuite=Unit|Feature|Integration
+ *          --help, --list-tests
  */
 
 $autoload = __DIR__ . '/vendor/autoload.php';
