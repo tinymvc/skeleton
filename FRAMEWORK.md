@@ -1,8 +1,22 @@
-# TinyMVC Framework Guide for AI Agents
+# TinyMVC Development Skill — Framework Reference
 
-This file is meant to be copied into or referenced from an application that uses TinyMVC/TinyCore. It tells an AI agent how to write backend code for a TinyMVC project without assuming Laravel, Symfony, or another framework.
+Use this reference when implementing, debugging, reviewing, or testing a TinyMVC/Spark application. The project-local skill entry point is [.agents/skills/tinymvc-development/SKILL.md](.agents/skills/tinymvc-development/SKILL.md). It selects the relevant parts of this file; reading the entire reference is unnecessary for a small task.
 
-If you are an AI agent working inside a TinyMVC application, read this file before editing code.
+This reference describes the current TinyCore implementation, including soft-delete scopes and the separate `upsert()` arguments. Check the application's installed source before using a newer API. A Composer constraint such as `^3.0` does not prove which implementation is installed.
+
+## Select the Relevant Reference
+
+| Task | Read these sections |
+| --- | --- |
+| New application feature or unfamiliar project | [Development workflow](#how-to-use-this-file), [layout](#typical-application-layout), [bootstrap](#core-bootstrap) |
+| Endpoint, validation, or permissions | [Routing](#routing), [controllers](#controllers), [requests](#requests-and-validation), [authorization](#auth-and-authorization) |
+| Data model or database query | [Models](#models), [relationships](#relationships), [query builder](#query-builder) |
+| Schema or many-to-many table | [Migrations and schema](#migrations-and-schema) |
+| Trash, restore, or permanent deletion | [Soft deletes](#soft-deletes), [testing](#testing) |
+| Browser interface | [Views](#views), [frontend integrations](#frontend-integrations), [middleware](#middleware) |
+| Background or shared work | [Queue and jobs](#queue-and-jobs), [cache](#cache), [locks](#locks) |
+| Framework extension | [Providers](#service-providers), [events](#events), [commands](#console-commands), [source lookup](#framework-source-lookup-paths) |
+| Verification or regression | [Testing](#testing), [verification](#verification-checklist-for-ai-agents) |
 
 ## What TinyMVC Is
 
@@ -28,7 +42,9 @@ In an application project, TinyCore source is normally installed under:
 ./vendor/tinymvc/tinycore/
 ```
 
-If an AI needs exact behavior, it should inspect these files as read-only reference. Do not edit vendor/framework files inside an application unless the user explicitly asks to patch the framework itself.
+Resolve the application's installed version from `composer.lock` / Composer installed metadata and read the matching implementation. Source code takes precedence over old examples and docblocks. In this multi-repository development workspace, `../tinycore/src` is a separate core checkout; use it when working on TinyCore itself, not as proof that an application's installed package has the same behavior.
+
+Treat installed vendor files as reference during application tasks. If the user requests a core change, edit the actual TinyCore checkout and verify the application's dependency separately. Do not silently change dependency versions or patch vendor code to make an example work.
 
 Core bootstrap and container:
 
@@ -42,10 +58,10 @@ Core bootstrap and container:
 
 Routing and request lifecycle:
 
-- Router: `./vendor/tinymvc/tinycore/src/Routing/Router.php`
-- Route builder: `./vendor/tinymvc/tinycore/src/Routing/Route.php`
-- Route groups: `./vendor/tinymvc/tinycore/src/Routing/RouteGroup.php`
-- Resource routes: `./vendor/tinymvc/tinycore/src/Routing/RouteResource.php`
+- Router: `./vendor/tinymvc/tinycore/src/Http/Routing/Router.php`
+- Route builder: `./vendor/tinymvc/tinycore/src/Http/Routing/Route.php`
+- Route groups: `./vendor/tinymvc/tinycore/src/Http/Routing/RouteGroup.php`
+- Resource routes: `./vendor/tinymvc/tinycore/src/Http/Routing/RouteResource.php`
 - Route facade: `./vendor/tinymvc/tinycore/src/Facades/Route.php`
 - Request: `./vendor/tinymvc/tinycore/src/Http/Request.php`
 - Response: `./vendor/tinymvc/tinycore/src/Http/Response.php`
@@ -72,6 +88,11 @@ Database, ORM, and migrations:
 
 - DB/PDO wrapper: `./vendor/tinymvc/tinycore/src/Database/DB.php`
 - Query builder: `./vendor/tinymvc/tinycore/src/Database/QueryBuilder.php`
+- Read/write/condition methods: `./vendor/tinymvc/tinycore/src/Database/Query/`
+- Soft deletes: `./vendor/tinymvc/tinycore/src/Database/Concerns/InteractsWithSoftDeletes.php`
+- ORM, relation subqueries, and pivots: `./vendor/tinymvc/tinycore/src/Database/Concerns/`
+- Model callbacks: `./vendor/tinymvc/tinycore/src/Database/Events.php`
+- DB facade transactions: `./vendor/tinymvc/tinycore/src/Facades/DB.php`
 - Model base class: `./vendor/tinymvc/tinycore/src/Database/Model.php`
 - Model casts trait: `./vendor/tinymvc/tinycore/src/Database/Casts/Castable.php`
 - Attribute cast helper: `./vendor/tinymvc/tinycore/src/Database/Casts/Attribute.php`
@@ -104,6 +125,7 @@ Views, console, events, facades, utilities, testing:
 - Console runner: `./vendor/tinymvc/tinycore/src/Console/Console.php`
 - Command registry: `./vendor/tinymvc/tinycore/src/Console/Commands.php`
 - Console stubs: `./vendor/tinymvc/tinycore/src/Foundation/Console/stubs/`
+- Migration/pivot generators: `./vendor/tinymvc/tinycore/src/Foundation/Console/MakeStubCommandsHandler.php`
 - Event dispatcher: `./vendor/tinymvc/tinycore/src/Events.php`
 - Facade base class: `./vendor/tinymvc/tinycore/src/Facades/Facade.php`
 - All facades: `./vendor/tinymvc/tinycore/src/Facades/`
@@ -117,18 +139,17 @@ Views, console, events, facades, utilities, testing:
 
 ## How To Use This File
 
-When implementing a feature in a TinyMVC app:
+1. Identify whether the user is changing an application, TinyCore, an optional integration, or documentation. Follow the existing app's choices and the user's requested scope.
+2. Inspect the relevant entry points: `composer.json`, installed package version, `bootstrap/app.php`, the matching routes/controller/model, and nearby tests. Check `package.json` only when frontend work is involved. Read only the configuration needed for the task; do not dump `.env` secrets.
+3. Choose the matching sections above. For uncertain signatures or side effects, inspect the installed method body, its traits, and the app's own wrappers. Method names resembling Laravel are not evidence of identical behavior.
+4. Implement a complete path through the relevant layers: route and middleware, input validation/authorization, persistence, response/view, and a focused regression when the behavior warrants it. Do not generate unused layers or change the frontend stack by default.
+5. Validate against the configured test environment. Report the behavior changed, checks run, and any dependency or driver limitation that remains.
 
-1. Inspect the current app structure first.
-2. Look for `bootstrap/app.php`, `routes/*.php`, `config/*.php`, `app/`, `database/`, `resources/views/`, and `storage/`.
-3. Follow existing namespaces and directory conventions in that app.
-4. Use `Spark\\` classes, TinyMVC helpers, and the app's own base classes.
-5. Do not edit `vendor/tinymvc/tinycore` or framework source unless the user explicitly asks to modify the framework itself.
-6. Do not create Laravel-specific files or syntax unless this app already provides compatibility.
+This file is framework guidance, not a replacement for the user's task. Commands below describe development workflows; examples of migrations, purges, workers, and external services are not instructions to execute them on live data. Generate and review the necessary code first, and use the intended test environment for verification.
 
 ## AI Agent Decision Rules
 
-Use this file as the framework contract for app code. When exact behavior matters, inspect the source lookup paths above, but treat `vendor/tinymvc/tinycore` as read-only in application projects.
+Use this file to choose the right framework APIs; use the installed implementation and existing app behavior to resolve version differences. Update only the relevant guidance when behavior changes.
 
 Prefer these choices:
 
@@ -138,7 +159,7 @@ Prefer these choices:
 - Database: use `Spark\Database\Model` or `query($table)` before raw SQL.
 - Background work: use class jobs with `Spark\Queue\Dispatchable`; use `dispatchOnce()` for recurring scheduler/cron jobs.
 - Paths: use config and helpers such as `storage_dir()`, `root_dir()`, `upload_dir()`, and `views_dir()`.
-- Framework uncertainty: inspect the matching source file under `./vendor/tinymvc/tinycore/src/...` before guessing Laravel behavior.
+- Framework uncertainty: inspect the matching source file under `./vendor/tinymvc/tinycore/src/` before guessing Laravel behavior.
 
 ## Typical Application Layout
 
@@ -384,7 +405,7 @@ Use helpers only when they already match the app style. In service classes, depe
 
 Routes are usually written in `routes/web.php`, `routes/api.php`, or `routes/webhook.php`.
 
-The route helper returns the router:
+`router()` returns the router. `route()` builds a named-route URL; use the route facade or `router()` to register endpoints:
 
 ```php
 use Spark\Facades\Route;
@@ -411,7 +432,7 @@ Route::any($path, $callback);
 Route::match(['GET', 'POST'], $path, $callback);
 Route::view('/about', 'pages.about');
 Route::fireline('/email-preview', 'emails.welcome');
-Route::inertia('/contact', 'Contact', ['key' => 'value']);
+Route::inertia('/contact', 'Contact', ['key' => 'value']); // Requires the Inertia adapter/provider
 Route::redirect('/old', '/new', 301);
 Route::fallback(fn() => response('Not found', 404));
 ```
@@ -510,7 +531,10 @@ class PostController extends Controller
     public function update(int $id, Request $request): array
     {
         $post = Post::findOrFail($id);
-        $post->fill($request->only(['title', 'body']));
+        $post->fill($request->validate([
+            'title' => 'required|string|max:255',
+            'body' => 'required|string',
+        ]));
         $post->save();
 
         return ['data' => $post];
@@ -534,7 +558,7 @@ Route callbacks and controller methods can return:
 - object castable to string
 - `Arrayable`
 
-Arrays are JSON encoded by `Response::send()`.
+Arrays are JSON encoded by `Response::send()`. The controller example shows the request/persistence shape; apply the app's authentication middleware and ownership authorization before changing private records.
 
 ## Requests and Validation
 
@@ -618,7 +642,7 @@ $request->input('email');
 $request->only(['name', 'email']);
 $request->except(['password']);
 $request->safe('body', ['p', 'strong']);
-$request->input()->boolean('published'); // through validated Input object
+$request->input()->boolean('published'); // Input wrapper; this does not validate the field
 ```
 
 ## Middleware
@@ -779,7 +803,7 @@ class Post extends Model
 {
     protected string $table = 'posts';
 
-    protected array $guarded = [];
+    protected array $fillable = ['title', 'body', 'published', 'meta', 'published_at'];
 
     protected array $casts = [
         'published' => 'boolean',
@@ -798,20 +822,20 @@ Defaults:
 
 Mass assignment:
 
-- Use `$guarded = []` to allow all fields.
-- Use `$fillable = [...]` to allow only specific fields.
-- Avoid passing unvalidated request data directly to `create()` or `fill()`.
+- `fill()` stores supplied attributes; `$fillable` / `$guarded` filter the persistence data. A nonempty fillable list takes precedence.
+- With no fillable list, guarded names exclude exact fields. `['*']` is not a wildcard guard in this implementation. Empty guarded/fillable lists allow all fields.
+- Validate input and authorize ownership before `create()` or `fill()`. Prefer an explicit fillable list; attributes retained on an object may still be serialized even when excluded from persistence.
 
-Create/update:
+Create/update (`$validated` is the result of request validation):
 
 ```php
 $post = Post::create([
-    'title' => $request->post('title'),
-    'body' => $request->post('body'),
+    'title' => $validated->get('title'),
+    'body' => $validated->get('body'),
 ]);
 
 $post = Post::findOrFail($id);
-$post->fill($request->only(['title', 'body']));
+$post->fill($validated);
 $post->save();
 
 $post->remove();
@@ -844,24 +868,67 @@ Casts:
 - `hashed`
 - custom cast class implementing `Spark\Database\Contracts\CastsAttributes`
 
-Accessors/mutators:
+Accessors/mutators use the classic methods:
 
 ```php
-use Spark\Database\Casts\Attribute;
+use Spark\Database\Model;
 
 class User extends Model
 {
-    public function nameAttribute(): Attribute
+    public function getNameAttribute($value): string
     {
-        return Attribute::make(
-            get: fn($value) => trim((string) $value),
-            set: fn($value) => trim((string) $value),
-        );
+        return trim((string) $value);
+    }
+
+    public function setNameAttribute($value): string
+    {
+        return trim((string) $value);
     }
 }
 ```
 
-Relations exist in `Spark\Database\Relation` and through model relation traits. Prefer following existing app examples before inventing relation syntax.
+The getter controls access; the setter runs when preparing storage data, not immediately on assignment. Prefer these or a custom cast over the current `<name>Attribute(): Attribute` dispatch path, which reads a property instead of calling that method. Recheck that implementation when upgrading.
+
+Custom casts implement `get($value)` and `set($value)` with no model/key/context parameters and are constructed without arguments. Null passes through; `decimal:2` produces a formatted string, and date/datetime/timestamp casts produce `Spark\Carbon` values. Hashed values are one-way; encrypted values depend on the application key.
+
+Model behavior to preserve:
+
+- `find()` / `first()` return a model or false; the `OrFail` variants throw. `all()` returns an array, `get()` a Collection, and `save()` / `remove()` booleans.
+- Disable timestamps with `protected const USE_TIMESTAMPS = false`; otherwise create both timestamp columns. `CREATED_AT` / `UPDATED_AT` rename them.
+- `getChanges()` contains original values of changed fields; read current attributes for new values. Dirty tracking needs a persisted baseline.
+- `copy()` clones the primary key too; it is not row replication. `only()` / `except()` return projected model objects, not plain arrays.
+- Hidden fields still win over `makeVisible()`. Appended values are added after filtering; only append public output.
+- Override protected `events(): Spark\Database\Events` for `created`, `updated`, `deleted`, and `changed` callbacks. They receive no arguments; use `$this`. Bulk builder writes do not dispatch per-row callbacks, and callbacks are not deferred until commit.
+- Add public `scopePublished(QueryBuilder $query)` methods for reusable conditions, then call `Post::published()`. Unknown builder methods may execute a query and forward to a Collection.
+
+## Relationships
+
+Declare public relationship methods using the model's protected helpers:
+
+```php
+public function posts(): \Spark\Database\Relation\HasMany
+{
+    return $this->hasMany(Post::class, foreignKey: 'user_id');
+}
+
+public function roles(): \Spark\Database\Relation\BelongsToMany
+{
+    return $this->belongsToMany(Role::class, table: 'roles_users',
+        foreignPivotKey: 'user_id', relatedPivotKey: 'role_id');
+}
+```
+
+Other helpers are `hasOne`, `belongsTo`, and `hasManyThrough`. Specify keys for custom schemas. `$user->posts` loads/caches results; `$user->posts()` returns a relation for query chaining. Use `User::with('posts')->all()` to avoid one query per parent. `with()` does not filter parent rows; `whereHas()` does, and both may be needed.
+
+- Nested eager loading: include the base before the nested path, e.g. `with(['posts', 'posts.comments'])`, or use a base callback calling `with('comments')`. Keep primary/foreign keys when selecting columns.
+- `load()` uses the lazy path and respects cached results / `lazy: false`. Use `with()` or static `loadRelations()` for explicit eager loading; `unsetRelation()` / `reloadRelations()` manage cached results.
+- `hasMany()->create()` / `save()` assign the parent key; persist the parent first and allow the foreign key in the child fillable list. `hasOne` needs a unique database constraint for enforced one-to-one cardinality.
+- `belongsTo()->associate()` / `dissociate()` change the child object; call `save()` to persist.
+- Pivot operations: `attach`, `detach`, `sync`, `syncWithoutDetaching`, `toggle`, `updateExistingPivot`. `sync()` returns attached/detached IDs; update existing pivot attributes explicitly. `detach()` without IDs removes all associations for the parent, not related records. Wrap multi-step changes in a transaction when required.
+- Pivot table defaults use sorted plural table names, e.g. `roles_users`. Configure `withPivot()` / `wherePivot()` before query execution and reload cached relations after mutations.
+- `withCount('posts')` adds `posts_count`; `withSum('posts', 'views')` adds `posts_sum`. Supply aliases to avoid collisions. Use `has()` for parent count filtering; extra comparison arguments on `withCount()` do not implement that filtering.
+- `morphWith()` uses an explicit map such as `['post' => ['class' => Post::class, 'relations' => ['user']]]`; do not assume `morphTo()` / `morphMany()` helpers exist.
+- Relationship existence/aggregate subqueries currently bypass automatic soft-delete filters. Supply qualified `whereNull('posts.deleted_at')` callbacks where active-only children are required; see [Soft deletes](#soft-deletes).
 
 ## Query Builder
 
@@ -894,12 +961,51 @@ Common methods:
 - `orderBy`, `orderAsc`, `orderDesc`
 - `limit`, `offset`, `take`, `skip`
 - `first`, `firstOrFail`, `last`, `all`, `get`, `paginate`
-- `value`, `pluck`, `count`, `exists`, `notExists`
-- `insert`, `bulkUpdate`, `update`, `delete`, `truncate`
+- `value`, `pluck`, `count`, `exists`, `doesntExist`
+- `insert`, `insertOrIgnore`, `insertOrReplace`, `upsert`, `update`, `delete`, `forceDelete`, `restore`, `truncate`
 - `updateOrInsert`, `increment`, `decrement`
 - `toSql`
 
-Prefer builder methods over string SQL. Use `whereRaw` or `raw` only when needed.
+Prefer builder methods over string SQL. Bind values; allowlist dynamic column names, sort directions, and SQL expressions. `select()` accepts an array/string or multiple columns. Repeated `orderBy()` calls replace ordering; use a trusted `orderByRaw()` for multiple sort columns.
+
+### Upserts and return values
+
+```php
+query('products')->upsert(
+    [
+        ['sku' => 'SPARK-01', 'name' => 'Starter', 'price' => 25],
+        ['sku' => 'SPARK-02', 'name' => 'Team', 'price' => 50],
+    ],
+    conflict: ['sku'],
+    update: ['name', 'price'],
+);
+```
+
+The signature is `upsert($data, ?array $conflict = null, ?array $update = null)`: separate arrays, not the old combined config array. Null conflict defaults to `['id']`; null/omitted/empty update selects all supplied non-conflict columns. Add a matching unique constraint. MySQL uses actual unique indexes, while SQLite/PostgreSQL use the conflict target. Insert variants return an integer last insert ID, not an affected-row count. `update()` / `delete()` / `forceDelete()` return affected-row counts; builder `restore()` returns bool.
+
+`firstOrCreate()` / `updateOrInsert()` are lookup-then-write operations; use unique constraints for concurrent inserts. `insertOrReplace()` currently emits replacement SQL on MySQL and plain inserts on SQLite/PostgreSQL. There is no declared `bulkUpdate()` method.
+
+### State, pagination, and write boundaries
+
+Use a fresh builder for each operation or `copy()` before execution. Retrieval resets query state; writes clear conditions/bindings. A method forwarded to Collection loads results into memory, so do not assume `chunk()` is database streaming. Mapper callbacks receive the whole result array, not a single row.
+
+`paginate($limit = 10, $keyword = 'page', $fields = null)` uses the query-string page and returns `Spark\Utils\Paginator`. Bound the page size and sort consistently. `items()`, `total()`, `page()`, and `pages()` expose data/metadata. Filter before pagination; grouped `count()` returns the first group's count rather than the number of groups.
+
+`update()`, `delete()`, `forceDelete()`, and builder `restore()` require a WHERE condition or an explicit trash scope on a soft-delete model. A bare default model query does not satisfy that guard. Increment/decrement can affect every row in scope; `truncate()` physically empties the whole table regardless of trash scope. Plain table queries do not apply model casts, lifecycle callbacks, or archive filtering.
+
+For nontrivial JSON/date-part SQL, inspect the driver-specific implementation. JSON helpers use field/key/value and text matching; PostgreSQL date-part/JSON behavior is not interchangeable with MySQL. Test on the production driver when depending on these differences.
+
+### Connections and transactions
+
+```php
+use Spark\Facades\DB;
+
+$result = DB::transaction(function () use ($userId) {
+    return DB::table('posts')->where('user_id', $userId)->update(['published' => true]);
+});
+```
+
+The facade helper commits the callback result or rolls back/rethrows an exception. It uses the application connection, with no nested savepoints or retry loop. `Spark\Database\DB::connection($configOrName)` creates a separate wrapper; use its `table()` and transaction methods consistently. Creating another wrapper does not move model queries or the cached static Schema connection to it. `connect_db()` returns a builder. `reset()` / `resetPdo()` replace connection state and must not interrupt a transaction.
 
 ## Migrations and Schema
 
@@ -950,8 +1056,108 @@ $table->string('email')->unique();
 $table->text('body')->nullable();
 $table->boolean('active')->default(true);
 $table->timestamp('published_at')->nullable();
-$table->foreignId('user_id', nullable: true)->constrained()->nullOnDelete(); // default: nullable=false
+$table->foreignId('user_id', nullable: true)->constrained()->setNullOnDelete(); // default: nullable=false
 ```
+
+### Generating and applying migrations
+
+```bash
+php spark make:migration create_posts_table
+php spark make:migration --pivot
+php spark migrate
+php spark migrate:rollback --step=1
+```
+
+`--pivot` (alias `-p`) prompts for the first and second related table names. `users` and `roles` produce a `roles_users` migration with an `id`, `user_id`, `role_id`, and cascading foreign keys. Generation writes a migration file; `php spark migrate` applies it. Related tables must exist first. Add a composite unique constraint yourself when duplicate associations are invalid.
+
+The runner records applied filenames in `database/migrations.json`. Preserve that file with its database. Files use `migration_` / `seed_` prefixes; `php spark make:seeder Name` and `php spark migrate --seed` handle seed files. `migrate:fresh` rolls back recorded migrations and replays them; it is destructive, not a read-only verification command.
+
+Create new migrations for deployed schemas instead of rewriting history. Failures can leave partial DDL because the runner does not automatically wrap each file in a transaction. On SQLite, adding/removing foreign keys or primary keys from existing tables needs a deliberate rebuild; there is no `change()` column modifier. Most type methods do not imply NOT NULL: call `required()` for required fields. Use `nullable: true` on `foreignId()` before `setNullOnDelete()`.
+
+## Soft Deletes
+
+### Model and schema setup
+
+Add a nullable deletion column and enable the model constant:
+
+```php
+use Spark\Database\Schema\Blueprint;
+use Spark\Database\Schema\Schema;
+
+// In a new migration for an existing table:
+Schema::table('posts', function (Blueprint $table) {
+    $table->softDeletes();
+});
+```
+
+```php
+namespace App\Models;
+
+use Spark\Database\Model;
+
+class Post extends Model
+{
+    protected const USE_SOFT_DELETES = true;
+    protected string $table = 'posts';
+    protected array $fillable = ['title', 'body', 'user_id'];
+    protected array $casts = ['deleted_at' => 'datetime'];
+}
+```
+
+`softDeletes()` takes no arguments and returns void; do not chain modifiers. The current Model already includes the soft-delete trait, attaches itself to queries, and composes scoped WHERE clauses. No application compatibility override or Laravel trait is needed. For an older installed package, verify these capabilities before generating code that relies on them.
+
+Apply the column migration before enabling the model. A rollback uses `$table->dropColumn('deleted_at')`; remove the model behavior before dropping the column. For a custom column, set `SOFT_DELETE_COLUMN = 'archived_at'`, cast it if needed, and create `$table->timestamp('archived_at')->nullable()`.
+
+### Select, archive, restore, and purge
+
+```php
+$active = Post::orderDesc('id')->all();
+$trash = Post::onlyTrashed()->orderDesc('id')->paginate(20);
+$all = Post::withTrashed()->all();
+$activeAgain = Post::withTrashed(false)->all();
+
+$post = Post::findOrFail($id);
+$post->remove();
+$archived = Post::onlyTrashed()->findOrFail($id);
+$isArchived = $archived->trashed();
+$restored = $archived->restore();
+
+$restoredAny = Post::onlyTrashed()->where('user_id', $userId)->restore();
+$purged = Post::onlyTrashed()->where('user_id', $userId)->forceDelete();
+```
+
+| Call on a soft-delete model | Effect |
+| --- | --- |
+| Normal read / `withoutTrashed()` / `withTrashed(false)` | Active rows only |
+| `onlyTrashed()` | Archived rows only |
+| `withTrashed()` | Active and archived rows |
+| `where(...)->delete()` | Archives matching active rows by default |
+| `onlyTrashed()->delete()` | Re-stamps archived rows; does not physically delete them |
+| `withTrashed()->delete()` | Stamps both active and archived rows |
+| `onlyTrashed()->restore()` / `withTrashed()->restore()` | Restores archived rows, optionally narrowed by WHERE |
+| `withoutTrashed()->restore()` | No changes: selection contains only active rows |
+| `onlyTrashed()->forceDelete()` | Permanently deletes the entire trash |
+| `withTrashed()->forceDelete()` | Permanently deletes all rows |
+| `withoutTrashed()->forceDelete()` | Permanently deletes active rows |
+| `where('id', $id)->forceDelete()` | Deletes that ID whether active or archived |
+| Bare `Post::query()->delete()` / `forceDelete()` / `restore()` | Returns zero/false because there is no explicit selection |
+
+The last trash-scope call wins and keeps existing WHERE conditions. An explicit scope satisfies the bulk-write guard; it is not ownership authorization. Add account/tenant conditions before archive/restore/purge operations that belong to one user.
+
+`remove()` and both restore entry points return bool; builder delete/forceDelete return affected-row counts. Call bulk restore on a builder, since `Post::restore()` collides with the non-static model method. A loaded `$post->forceDelete()` is constrained by its primary key. Deletion does not update a previously loaded object's deletion timestamp: re-fetch with `onlyTrashed()` / `withTrashed()` before `trashed()`. Ordinary `refresh()` cannot fetch archived records.
+
+### Relationship and database boundaries
+
+- Enable soft deletes independently on each related model. `$user->posts()->onlyTrashed()->forceDelete()` and `restore()` retain the parent foreign-key condition.
+- Eager-loading callbacks may use `withTrashed()`. Relationship existence/count/aggregate subqueries currently use raw conditions: add a qualified `whereNull('posts.deleted_at')` callback when active-only children are required.
+- The generated deletion predicate is unqualified. For joins with overlapping deletion-column names, use explicit qualified conditions with a read query configured `withTrashed()`; joined pivot/intermediate tables need their own filters.
+- `query('posts')`, raw SQL, and non-soft-delete models have no automatic archive behavior. Trash switches on those builders do not authorize unfiltered writes.
+- Soft deletion is an update, so it does not trigger foreign-key delete cascades or release a normal unique constraint. Decide explicitly whether a conflicting archived record should be restored.
+- Bulk writes do not fire callbacks once per row or cascade archive/restore operations. There are no dedicated restoring/restored callbacks in the current model event set.
+
+### Regression cases for a trash feature
+
+Use an isolated database with active and archived rows belonging to at least two owners. Verify ordinary reads hide archived rows, trash reads hide active rows, restore clears the timestamp, and permanent deletion removes only the selected rows. Check wrong-owner IDs, repeated operations, custom columns if used, relationship boundaries, and explicit scope switching. Use actual affected-row/state assertions, not just a successful HTTP status.
 
 ## Auth and Authorization
 
@@ -971,8 +1177,9 @@ auth()->id();
 Gate:
 
 ```php
-gate()->define('update-post', function ($user, $post) {
-    return $user && $post->user_id === $user->id;
+gate()->define('update-post', function ($post) {
+    $user = auth()->user();
+    return $user !== null && (string) $post->user_id === (string) $user->id;
 });
 
 if (can('update-post', $post)) {
@@ -982,7 +1189,7 @@ if (can('update-post', $post)) {
 authorize('update-post', $post); // throws AuthorizationException on deny
 ```
 
-`AuthorizationException` is mapped to HTTP 403.
+`AuthorizationException` is mapped to HTTP 403. Gate forwards only the supplied arguments; it does not automatically inject the authenticated user. Read `auth()->user()` in the callback or pass the user explicitly.
 
 ## Cache
 
@@ -1202,6 +1409,19 @@ Blade::share('key', $value);
 
 Use existing app template style. TinyCore has its own Blade-like compiler, not full Laravel Blade.
 
+## Frontend Integrations
+
+Inspect `package.json`, `vite.config.js`, existing templates/pages, and registered providers before choosing an approach. The skeleton uses Vite, Tailwind, Alpine, and Blade; optional packages may add different capabilities.
+
+| Existing stack | Development approach |
+| --- | --- |
+| Blade + Alpine | Server-rendered views with targeted browser interactions; preserve CSRF form handling |
+| FireLine | Follow the installed integration's navigation/form conventions and current app templates |
+| Inertia PHP + React/Vue | Verify the adapter/provider and matching client version, then return the app's existing Inertia responses |
+| Orbit | Extend its existing administration resources, BREAD, access rules, and React/shadcn components rather than creating a parallel admin architecture |
+
+`Route::inertia()` needs the adapter service provider; a route method name alone does not install the integration. Inspect the installed package README/source for version-sensitive props and APIs. Do not add FireLine, Inertia, React, Vue, or Orbit unless the app/task calls for that integration. Use the app's Vite asset helper and build configuration instead of hardcoded development-server URLs.
+
 ## Responses and Redirects
 
 ```php
@@ -1266,7 +1486,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        app()->singleton(App\Services\BillingService::class);
+        app()->singleton(\App\Services\BillingService::class);
     }
 
     public function boot(): void
@@ -1292,7 +1512,7 @@ The event dispatcher supports priorities, one-time listeners, dispatch with resp
 
 ## Console Commands
 
-Command routes may be loaded through `withRouting(commands: __DIR__ . '/routes/console.php')`.
+Command routes may be loaded through `withRouting(commands: __DIR__ . '/../routes/console.php')` from `bootstrap/app.php`.
 
 Use the command registry:
 
@@ -1395,7 +1615,7 @@ TinyMVC includes a dependency-free plain PHP runner. Run `php test` or
 - Application feature tests: `tests/Feature/*Test.php`, extending `Tests\TestCase`.
 - Feature lifecycle: `Spark\Testing\ApplicationTestCase` creates a fresh app.
 - Response assertions: `Spark\Testing\TestResponse` wraps `Spark\Http\Response`.
-- Bootstrap and test config: `tests/bootstrap.php` and `tests/config.php`.
+- Entry point and test config: the root `test` runner, `tests/TestCase.php`, and `tests/config.php`; follow any custom bootstrap present in the app.
 
 Tests are public non-static `test*` methods without arguments. Use strict
 assertions such as `assertSame`, `assertTrue`, `assertCount`, and `assertArrayHasKey`.
@@ -1412,8 +1632,9 @@ Feature helpers include `get`, `post`, `getJson`, `postJson`, and
 `put`, `patch`, `delete`, `options`, `head`, `putJson`, `patchJson`, and `deleteJson`.
 Use `withHeaders`, `withToken`, `withSession`, `withCookies`, and `actingAs` for
 request state. `assertDatabaseHas`, `assertDatabaseMissing`, and
-`assertDatabaseCount` inspect the configured test database. TinyCore itself ships
-only `src/Testing/`; application tests live in the skeleton's `tests/`.
+`assertDatabaseCount` inspect the configured test database. Application tests live
+in the skeleton's `tests/`. In a TinyCore source checkout, `php tests/soft-deletes.php`
+runs the focused soft-delete regression suite when that file is available.
 
 `APP_ENV=testing` must be set before creating a CLI application. In that mode,
 `.env` and config caches are skipped; `Application::create()` merges
@@ -1423,8 +1644,7 @@ including CSRF, remains active. Unexpected exceptions reach the runner; early
 responses, redirects, aborts, and validation errors are captured. Deferred work
 runs after each successful request without flushing the runner's buffers.
 
-Do not add PHPUnit, Pest, Laravel testing traits, or other testing packages.
-Use the built-in assertions and small PHP stub objects.
+Use the built-in assertions and small PHP stub objects by default. Do not introduce another test runner or Laravel-specific test traits just to write a regression; honor an existing app test stack or an explicit user request to change it.
 
 ## Verification Checklist For AI Agents
 
@@ -1433,15 +1653,15 @@ Before finishing changes in a TinyMVC app:
 1. Run `php -l` on every changed PHP file.
 2. Check route/controller namespaces match the app.
 3. Check middleware aliases exist in `bootstrap/middlewares.php`.
-4. Check config keys match this file.
-5. If changing DB code, verify migration/model/table names.
+4. Check config keys and APIs against the installed framework and app overrides.
+5. If changing DB code, verify schema/model names, return types, and active/archive/owner boundaries using an isolated database.
 6. If changing CORS/CSRF/throttle, test normal request and preflight/invalid cases when possible.
 7. If changing queue/cache/lock, test sqlite default and consider redis parity.
 8. Run `git diff --check`.
-9. Run `composer test` when the project has a test suite.
+9. Run relevant tests with `php test --filter=Name` or `composer test -- --filter=Name`; run the full suite for shared behavior changes. Run `npm run build` when frontend assets change.
 10. Mention anything not tested.
 
-## Minimal Mental Model
+## Request Lifecycle Summary
 
 TinyMVC request flow:
 
