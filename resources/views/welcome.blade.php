@@ -28,26 +28,31 @@
             max-width: 520px;
         }
 
-        .mark {
-            display: inline-block;
-            width: 48px;
-            height: 48px;
-            background: #1a1a1a;
-            border-radius: 10px;
-            margin-bottom: 2rem;
-            position: relative;
+        .logo {
+            width: 60px;
+            height: 60px;
         }
 
-        .mark::after {
-            content: '';
+        .branding {
+            position: relative;
+            width: max-content;
+            margin: auto;
+            font-size: 29px;
+            margin-bottom: 20px;
+        }
+
+        .branding small {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 18px;
-            height: 18px;
-            border: 2.5px solid #fff;
-            border-radius: 3px;
-            transform: translate(-50%, -50%) rotate(45deg);
+            bottom: -3px;
+            right: 1px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            text-align: right;
+            margin-top: -2px;
+            font-size: 7px;
+            font-weight: 500;
+            display: block;
+            opacity: 0.85;
         }
 
         h1 {
@@ -55,13 +60,6 @@
             font-weight: 700;
             letter-spacing: -0.5px;
             margin-bottom: 0.25rem;
-        }
-
-        .ver {
-            font-size: 0.8rem;
-            color: #999;
-            font-weight: 500;
-            margin-bottom: 1.5rem;
         }
 
         p {
@@ -141,19 +139,21 @@
 
 <body>
     <div class="wrap">
-        <div class="mark"></div>
-        <h1>TinyMVC</h1>
-        <div class="ver">&mdash;Spark v3.x</div>
+        <img class="logo" src="https://tinymvc.github.io/flame.svg" alt="TinyMVC Logo" />
+        <h2 class="branding">
+            spark
+            <small>BY TINYMVC</small>
+        </h2>
         <p>A lightweight MVC framework for PHP artisans.<br>Simple tools, clean code, real projects.</p>
         <div class="links">
             <a href="https://tinymvc.github.io" class="docs" target="_blank">Documentation</a>
-            <a href="https://github.com/tinymvc/tinymvc" class="gh" target="_blank">GitHub</a>
+            <a href="https://github.com/tinymvc/tinycore/tree/main/src" class="gh" target="_blank">GitHub</a>
         </div>
         <div class="sep"></div>
         <div class="bottom">
-            <a href="https://github.com/tinymvc/tinymvc/stargazers" target="_blank">Star</a>
-            <a href="https://github.com/tinymvc/tinymvc/issues" target="_blank">Issues</a>
-            <a href="https://github.com/tinymvc/tinymvc/releases" target="_blank">Releases</a>
+            <a href="https://github.com/tinymvc/tinycore/stargazers" target="_blank">Star</a>
+            <a href="https://github.com/tinymvc/tinycore/issues" target="_blank">Issues</a>
+            <a href="https://github.com/tinymvc/tinycore/releases" target="_blank">Releases</a>
         </div>
     </div>
 </body>
