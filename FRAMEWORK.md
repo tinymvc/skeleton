@@ -920,7 +920,7 @@ public function roles(): \Spark\Database\Relation\BelongsToMany
 
 Other helpers are `hasOne`, `belongsTo`, and `hasManyThrough`. Specify keys for custom schemas. `$user->posts` loads/caches results; `$user->posts()` returns a relation for query chaining. Use `User::with('posts')->all()` to avoid one query per parent. `with()` does not filter parent rows; `whereHas()` does, and both may be needed.
 
-- Nested eager loading: include the base before the nested path, e.g. `with(['posts', 'posts.comments'])`, or use a base callback calling `with('comments')`. Keep primary/foreign keys when selecting columns.
+- Nested eager loading: `with('posts.comments')` works directly; a keyed callback on that path constrains comments. Keep primary/foreign keys when selecting columns.
 - `load()` uses the lazy path and respects cached results / `lazy: false`. Use `with()` or static `loadRelations()` for explicit eager loading; `unsetRelation()` / `reloadRelations()` manage cached results.
 - `hasMany()->create()` / `save()` assign the parent key; persist the parent first and allow the foreign key in the child fillable list. `hasOne` needs a unique database constraint for enforced one-to-one cardinality.
 - `belongsTo()->associate()` / `dissociate()` change the child object; call `save()` to persist.
@@ -928,7 +928,7 @@ Other helpers are `hasOne`, `belongsTo`, and `hasManyThrough`. Specify keys for 
 - Pivot table defaults use sorted plural table names, e.g. `roles_users`. Configure `withPivot()` / `wherePivot()` before query execution and reload cached relations after mutations.
 - `withCount('posts')` adds `posts_count`; `withSum('posts', 'views')` adds `posts_sum`. Supply aliases to avoid collisions. Use `has()` for parent count filtering; extra comparison arguments on `withCount()` do not implement that filtering.
 - `morphWith()` uses an explicit map such as `['post' => ['class' => Post::class, 'relations' => ['user']]]`; do not assume `morphTo()` / `morphMany()` helpers exist.
-- Relationship existence/aggregate subqueries currently bypass automatic soft-delete filters. Supply qualified `whereNull('posts.deleted_at')` callbacks where active-only children are required; see [Soft deletes](#soft-deletes).
+- Related reads, direct relation `count()`, `has()` / `whereHas()`, and `withCount()` / other aggregates apply the related model's soft-delete scope by default. Use `withTrashed()` / `onlyTrashed()` in each related-query callback to override it. Parent scopes do not propagate to children; see [Soft deletes](#soft-deletes) for joined-table boundaries.
 
 ## Query Builder
 
@@ -981,19 +981,19 @@ query('products')->upsert(
 );
 ```
 
-The signature is `upsert($data, ?array $conflict = null, ?array $update = null)`: separate arrays, not the old combined config array. Null conflict defaults to `['id']`; null/omitted/empty update selects all supplied non-conflict columns. Add a matching unique constraint. MySQL uses actual unique indexes, while SQLite/PostgreSQL use the conflict target. Insert variants return an integer last insert ID, not an affected-row count. `update()` / `delete()` / `forceDelete()` return affected-row counts; builder `restore()` returns bool.
+The signature is `upsert($data, ?array $conflict = null, ?array $update = null)`: separate arrays, not the old combined config array. Null conflict defaults to `['id']`; null/omitted/empty update selects all supplied non-conflict columns. Add a matching unique constraint. MySQL uses actual unique indexes, while SQLite/PostgreSQL use the conflict target. Insert variants return an integer ID, not an affected-row count. PostgreSQL reads it from RETURNING and returns zero for inserts without a numeric primary key; ignored inserts return zero. `update()` / `delete()` / `forceDelete()` return affected-row counts; builder `restore()` returns bool.
 
-`firstOrCreate()` / `updateOrInsert()` are lookup-then-write operations; use unique constraints for concurrent inserts. `insertOrReplace()` currently emits replacement SQL on MySQL and plain inserts on SQLite/PostgreSQL. There is no declared `bulkUpdate()` method.
+`firstOrCreate()` / `updateOrInsert()` are lookup-then-write operations; use unique constraints for concurrent inserts. `insertOrReplace()` emits replacement SQL on MySQL/SQLite and throws on PostgreSQL; use explicit upsert conflict columns there. There is no declared `bulkUpdate()` method.
 
 ### State, pagination, and write boundaries
 
 Use a fresh builder for each operation or `copy()` before execution. Retrieval resets query state; writes clear conditions/bindings. A method forwarded to Collection loads results into memory, so do not assume `chunk()` is database streaming. Mapper callbacks receive the whole result array, not a single row.
 
-`paginate($limit = 10, $keyword = 'page', $fields = null)` uses the query-string page and returns `Spark\Utils\Paginator`. Bound the page size and sort consistently. `items()`, `total()`, `page()`, and `pages()` expose data/metadata. Filter before pagination; grouped `count()` returns the first group's count rather than the number of groups.
+`paginate($limit = 10, $keyword = 'page', $fields = null)` uses the query-string page and returns `Spark\Utils\Paginator`. Bound the page size and sort consistently. `items()`, `total()`, `page()`, and `pages()` expose data/metadata. Filter before pagination; grouped `count()` counts groups, and distinct/union totals are preserved. Pagination counts the result before applying limit/offset on every driver.
 
 `update()`, `delete()`, `forceDelete()`, and builder `restore()` require a WHERE condition or an explicit trash scope on a soft-delete model. A bare default model query does not satisfy that guard. Increment/decrement can affect every row in scope; `truncate()` physically empties the whole table regardless of trash scope. Plain table queries do not apply model casts, lifecycle callbacks, or archive filtering.
 
-For nontrivial JSON/date-part SQL, inspect the driver-specific implementation. JSON helpers use field/key/value and text matching; PostgreSQL date-part/JSON behavior is not interchangeable with MySQL. Test on the production driver when depending on these differences.
+For nontrivial JSON/date-part SQL, inspect the driver-specific implementation. JSON helpers use field/key/value and text matching on all three drivers; use dot-separated object paths for portable cases. Date-part helpers extract DATE/YEAR/MONTH on all three drivers. Test on the production driver when depending on these differences.
 
 ### Connections and transactions
 
@@ -1005,7 +1005,7 @@ $result = DB::transaction(function () use ($userId) {
 });
 ```
 
-The facade helper commits the callback result or rolls back/rethrows an exception. It uses the application connection, with no nested savepoints or retry loop. `Spark\Database\DB::connection($configOrName)` creates a separate wrapper; use its `table()` and transaction methods consistently. Creating another wrapper does not move model queries or the cached static Schema connection to it. `connect_db()` returns a builder. `reset()` / `resetPdo()` replace connection state and must not interrupt a transaction.
+The facade helper commits the callback result or rolls back/rethrows an exception. It uses the application connection, creates savepoints for nested calls, and has no retry loop. Never manually finish/reconnect the transaction or use implicitly committing DDL inside a callback. `Spark\Database\DB::connection($configOrName)` creates a separate wrapper; use its `table()` and transaction methods consistently. Creating another wrapper does not move models or Schema to it. Schema refreshes its cached PDO/grammar when the application DB is replaced. `connect_db()` returns a builder. `reset()` / `resetPdo()` replace connection state and must not interrupt a transaction.
 
 ## Migrations and Schema
 
@@ -1149,8 +1149,13 @@ The last trash-scope call wins and keeps existing WHERE conditions. An explicit 
 ### Relationship and database boundaries
 
 - Enable soft deletes independently on each related model. `$user->posts()->onlyTrashed()->forceDelete()` and `restore()` retain the parent foreign-key condition.
-- Eager-loading callbacks may use `withTrashed()`. Relationship existence/count/aggregate subqueries currently use raw conditions: add a qualified `whereNull('posts.deleted_at')` callback when active-only children are required.
-- The generated deletion predicate is unqualified. For joins with overlapping deletion-column names, use explicit qualified conditions with a read query configured `withTrashed()`; joined pivot/intermediate tables need their own filters.
+- Eager loading, relationship existence checks, and aggregates all use the related model's prepared scope. `User::has('posts')` ignores archived posts; `doesntHave('posts')` includes users whose posts are all archived. `withCount('posts')` counts active posts; `withCount('posts as all_posts', fn($q) => $q->withTrashed())` includes archives. Custom deletion-column names work too.
+- Set archive scopes independently on parent and related queries, and on each loading/filtering/aggregate operation. `User::withTrashed()->with('posts')` still loads only active posts. Nested paths scope every model; a `whereHas('posts.comments', $callback)` callback changes only the deepest (`comments`) query. Use nested callbacks to override intermediate scopes.
+- A `belongsTo` owner hidden by its soft-delete scope loads as null; include it explicitly with `with(['user' => fn($q) => $q->withTrashed()])` when needed. Relationship-definition callbacks apply to lazy/eager reads, but existence/aggregate queries use only their own supplied callback.
+- Automatic deletion predicates are driver-quoted and qualified using the read alias or actual table name. Qualify user-written join conditions separately. Writes target the physical table and do not emit read aliases; use unaliased write conditions.
+- `hasManyThrough()` filters both the final model and a soft-deletable intermediate model by default. `withTrashedParents()` includes archived intermediates; `withTrashedParents(false)` restores their active-only scope. It works on the relation definition, direct relation, or loading/existence/aggregate callback. `withTrashed()` controls final records independently. Custom intermediate deletion columns are respected.
+- Plain pivot tables have no model scope. When links deliberately have a deletion column, declare `->wherePivotNull('deleted_at')` on the relation; it applies to lazy/eager reads, `has()`, and aggregates. A separate `wherePivotNotNull()` relation can read archived links. Neither `withTrashed()` nor `withTrashedParents()` removes a pivot condition. `detach()` / `sync()` still physically delete links; this filter does not add a pivot archive lifecycle.
+- Arbitrary `join()` calls do not infer soft-delete settings for other tables. Supply explicit conditions for those joins; ordinary pivot tables without deletion columns need no change.
 - `query('posts')`, raw SQL, and non-soft-delete models have no automatic archive behavior. Trash switches on those builders do not authorize unfiltered writes.
 - Soft deletion is an update, so it does not trigger foreign-key delete cascades or release a normal unique constraint. Decide explicitly whether a conflicting archived record should be restored.
 - Bulk writes do not fire callbacks once per row or cascade archive/restore operations. There are no dedicated restoring/restored callbacks in the current model event set.
@@ -1633,8 +1638,8 @@ Feature helpers include `get`, `post`, `getJson`, `postJson`, and
 Use `withHeaders`, `withToken`, `withSession`, `withCookies`, and `actingAs` for
 request state. `assertDatabaseHas`, `assertDatabaseMissing`, and
 `assertDatabaseCount` inspect the configured test database. Application tests live
-in the skeleton's `tests/`. In a TinyCore source checkout, `php tests/soft-deletes.php`
-runs the focused soft-delete regression suite when that file is available.
+in the skeleton's `tests/`. In a TinyCore source checkout, `php tests/soft-delete-scopes.php`
+runs the standalone SQLite scope/alias/relationship regression suite.
 
 `APP_ENV=testing` must be set before creating a CLI application. In that mode,
 `.env` and config caches are skipped; `Application::create()` merges
