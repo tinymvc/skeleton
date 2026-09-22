@@ -4,6 +4,7 @@ return [
     'driver' => env('DB_CONNECTION', 'sqlite'), // Database driver
     'connections' => [
         'sqlite' => [
+            'driver' => 'sqlite',
             'file' => dirname(__DIR__) . '/database/sqlite.db', // SQLite Database filepath 
         ],
         'default' => [

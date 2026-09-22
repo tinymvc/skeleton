@@ -20,7 +20,7 @@ return [
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
             'token' => env('AWS_SESSION_TOKEN'), // Optional temporary credentials
-            'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+            'region' => env('AWS_DEFAULT_REGION'),
             'bucket' => env('AWS_BUCKET'),
             'url' => env('AWS_URL'), // Optional public/CDN URL; never used for signing
             'endpoint' => env('AWS_ENDPOINT'), // Null for AWS; regional origin for Spaces/other services
