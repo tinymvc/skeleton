@@ -132,7 +132,7 @@ Views, console, events, facades, utilities, testing:
 - Carbon-like date utility: `./vendor/tinymvc/tinycore/src/Carbon.php`
 - Mail utility: `./vendor/tinymvc/tinycore/src/Utils/Mail.php`
 - HTTP client: `./vendor/tinymvc/tinycore/src/Http/Client/`
-- Upload/file/image utilities: `./vendor/tinymvc/tinycore/src/Utils/Uploader.php`, `./vendor/tinymvc/tinycore/src/Utils/FileManager.php`, `./vendor/tinymvc/tinycore/src/Utils/Image.php`
+- Upload/file/image utilities: `./vendor/tinymvc/tinycore/src/Storage/Uploader.php`, `./vendor/tinymvc/tinycore/src/Utils/FileManager.php`, `./vendor/tinymvc/tinycore/src/Utils/Image.php`
 - Tracer/debugging: `./vendor/tinymvc/tinycore/src/Tracer.php`
 - Vite integration: `./vendor/tinymvc/tinycore/src/Utils/Vite.php`
 - Unit/Feature Testing: `vendor/tinymvc/tinycore/src/Testing/ApplicationTestCase.php`, `vendor/tinymvc/tinycore/src/Testing/Assert.php`, `vendor/tinymvc/tinycore/src/Testing/TestCase.php`
@@ -1444,6 +1444,27 @@ For explicit JSON status codes, prefer `json($data, $status)`.
 
 ## Files and Uploads
 
+Use `disk()` / `Spark\Facades\Disk` for storage that may be local, public, or S3-compatible. Configuration is in `config/disk.php`; `FILESYSTEM_DISK` chooses the default. The concrete class is `Spark\Storage\Disk`.
+
+```php
+$disk = disk('public');
+$disk->put('reports/result.txt', 'Ready');
+$contents = $disk->get('reports/result.txt');
+$path = $disk->uploader('avatars', extensions: ['jpg', 'png'], maxSize: 2048)
+    ->upload($request->file('avatar'));
+$url = $disk->url($path);
+```
+
+- `local` defaults to private `storage/app`; `public` uses `storage/uploads` and the existing `storage:link` mapping. Keys are relative paths, never URLs or absolute paths. Traversal is rejected; local child symlinks are not followed.
+- Use `putFile($directory, $localPath)` or `putFileAs($directory, $localPath, $name)` for trusted existing local files. These return keys and preserve the source. HTTP uploads must use genuine PHP upload files; size checks use their actual size, not a submitted size value.
+- Disk-backed uploaders retain extension/size validation, image resizing, variants, and cleanup. Their driver destinations and returned paths are disk-relative. Staging lives under private `storage/temp/disk-uploads`.
+- `Spark\Storage\S3UploaderDriver` implements the existing `UploaderUtilDriverInterface` and delegates to `Spark\Storage\S3Storage`. Configure AWS or compatible endpoints, region, bucket, key/secret, optional session token, optional public/CDN URL, and path-style addressing. ACLs are omitted by default; use `acl: public-read` only for an ACL-enabled public bucket.
+- `exists`, `missing`, `get`, `put`, `copy`, `move`, `delete`, `files`, `allFiles`, `size`, `mimeType`, and `lastModified` share the disk API. Storage failures throw; missing-file deletion succeeds. Arrays and moves are not atomic. Local copies stream; S3 copies run on the server and preserve object metadata.
+- `path()` is local-only. `url()` requires a configured URL on local disks and does not grant public access on S3. `temporaryUrl($key, $secondsOrDateTime)` is S3-only, signs the origin, and allows 1–604800 seconds. Authorize private downloads first.
+- S3 uses SigV4 with cURL; listings use SimpleXML. Single PUTs are limited to 5 GiB; multipart uploads, bucket management, and automatic role-credential discovery/refresh are not implemented. Validate behavior and policy on the selected provider.
+- Config files load before application config is merged: use `dirname(__DIR__)` for filesystem defaults there, not `storage_dir()` / `media_url()`. Those helpers are available in running application code.
+
+
 Request file helpers:
 
 ```php
@@ -1684,3 +1705,13 @@ public/index.php
 ```
 
 Use `Spark\\` classes, app namespaces, and the helpers in this file. When unsure, inspect nearby app files and follow the existing TinyMVC pattern.
+
+## Storage contracts and compatibility
+
+Storage implementations are `Spark\Storage\Disk`, `Spark\Storage\Uploader`, and `Spark\Storage\S3Storage`. The old `Spark\Disk` class is removed; update imports to `Spark\Storage\Disk`. The two old `Spark\Utils` names remain deprecated aliases. The uploader's existing contracts and exception namespace remain compatible.
+
+Inject `Spark\Storage\Contracts\DiskContract` for application services. The application binds it to the default disk lazily, and default `Spark\Facades\Disk` calls resolve that binding. A provider may override it with a closure returning a selected disk. Named `disk()` calls and explicit `Disk::disk()` / `Disk::build()` construct disks directly.
+
+S3 listing defaults to ListObjectsV2; configure `list_version: 1` only for legacy endpoints. Low-level `listFiles()` returns `next_marker`, which is an opaque continuation token for V2 and must be passed back unchanged. S3 copy is server-side, preserves metadata, and checks for error XML in successful HTTP responses before a move can delete its source. GET preserves content-encoded object bytes. Both upload and single copy are capped at 5 GiB; multipart operations are not implemented.
+
+Keep S3 ACLs null for policy-controlled AWS buckets and R2. R2 uses region `auto` and a path-style account endpoint. Spaces uses a regional origin; MinIO needs the deployment's own origin/region/addressing settings. Current storage tests use local fixtures, not live cloud accounts. Run an authorized disposable-prefix smoke test against the deployment's actual bucket/policy before release.
