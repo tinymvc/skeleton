@@ -1179,6 +1179,36 @@ auth()->user();
 auth()->id();
 ```
 
+Named guards are separate Auth singletons. Register them in a provider's `register()` method before use:
+
+```php
+\Spark\Http\Auth::register(
+    model: \App\Models\Admin::class, // Application-defined model and table
+    config: [
+        'channels' => ['session'],
+        'session_key' => 'admin_id',
+        'cookie_name' => 'admin_auth',
+        'cache_name' => 'admin_auth_cache',
+        'login_route' => 'admin.login',
+        'redirect_route' => 'admin.dashboard',
+    ],
+    guard: 'admin',
+);
+
+$adminAuth = \Spark\Http\Auth::guard('admin'); // Also auth('admin')
+$admin = user(guard: 'admin');
+$email = user('email', 'Guest', guard: 'admin');
+$signedIn = is_logged('admin'); // Also $request->isAuthenticated('admin')
+$guest = is_guest('admin');    // Also $request->isNotAuthenticated('admin')
+$admin = $request->user(guard: 'admin');
+```
+
+`Auth::register()` registers `auth.<guard>`; it does not register a user account. `default` is reserved and resolves `Spark\Http\Auth`, so customize that class binding rather than registering a guard named `default`. Use distinct session keys, cookie names, and cache names for independent guards. Selection does not change subsequent default `auth()` / `user()` calls. Blade supports `@auth('admin')` / `@guest('admin')`; use the same guard when reading the identity inside those blocks and in gate callbacks.
+
+Channels are checked in fixed order JWT, Basic, then session. Basic looks up `username`. JWTs identify the model, not the guard name; two guards using the same model/key are not separate token audiences. Regenerate the session after successful browser login. Guard logout clears its configured identity/cookie; session invalidation clears all guards sharing that session.
+
+In the currently reviewed core checkout, `Foundation/Http/Middlewares/AuthMiddleware.php` is missing its namespace and strips `!` before testing negation. Do not assume the skeleton's namespaced parent or `auth:!admin` works. Use a standalone `MiddlewareInterface` implementation checking `auth($guard)->check()` (or `isGuest()` for guest routes) until the installed implementation is corrected. Register its alias in `bootstrap/middlewares.php` and use explicit guard names through downstream code.
+
 Gate:
 
 ```php
@@ -1446,6 +1476,8 @@ For explicit JSON status codes, prefer `json($data, $status)`.
 
 Use `disk()` / `Spark\Facades\Disk` for storage that may be local, public, or S3-compatible. Configuration is in `config/disk.php`; `FILESYSTEM_DISK` chooses the default. The concrete class is `Spark\Storage\Disk`.
 
+`Spark\Facades\Disk::disk('s3')` and `Spark\Storage\Disk::disk('s3')` both construct a named disk, as does `disk('s3')`. Selection does not change the default. Use the facade for static instance operations such as `Disk::put(...)`; with the concrete class use `Disk::disk('s3')->put(...)` or an injected instance.
+
 ```php
 $disk = disk('public');
 $disk->put('reports/result.txt', 'Ready');
@@ -1461,6 +1493,7 @@ $url = $disk->url($path);
 - `Spark\Storage\S3UploaderDriver` implements the existing `UploaderUtilDriverInterface` and delegates to `Spark\Storage\S3Storage`. Configure AWS or compatible endpoints, region, bucket, key/secret, optional session token, optional public/CDN URL, and path-style addressing. ACLs are omitted by default; use `acl: public-read` only for an ACL-enabled public bucket.
 - `exists`, `missing`, `get`, `put`, `copy`, `move`, `delete`, `files`, `allFiles`, `size`, `mimeType`, and `lastModified` share the disk API. Storage failures throw; missing-file deletion succeeds. Arrays and moves are not atomic. Local copies stream; S3 copies run on the server and preserve object metadata.
 - `path()` is local-only. `url()` requires a configured URL on local disks and does not grant public access on S3. `temporaryUrl($key, $secondsOrDateTime)` is S3-only, signs the origin, and allows 1–604800 seconds. Authorize private downloads first.
+- Signed S3 URLs include an attachment content-disposition response override using `basename($key)` as the download filename. Do not modify the signed query. There is no custom filename or inline-display option, and URL generation itself does not check object existence.
 - S3 uses SigV4 with cURL; listings use SimpleXML. Single PUTs are limited to 5 GiB; multipart uploads, bucket management, and automatic role-credential discovery/refresh are not implemented. Validate behavior and policy on the selected provider.
 - Config files load before application config is merged: use `dirname(__DIR__)` for filesystem defaults there, not `storage_dir()` / `media_url()`. Those helpers are available in running application code.
 
@@ -1708,10 +1741,10 @@ Use `Spark\\` classes, app namespaces, and the helpers in this file. When unsure
 
 ## Storage contracts and compatibility
 
-Storage implementations are `Spark\Storage\Disk`, `Spark\Storage\Uploader`, and `Spark\Storage\S3Storage`. The old `Spark\Disk` class is removed; update imports to `Spark\Storage\Disk`. The two old `Spark\Utils` names remain deprecated aliases. The uploader's existing contracts and exception namespace remain compatible.
+Storage implementations are `Spark\Storage\Disk`, `Spark\Storage\Uploader`, and `Spark\Storage\S3Storage`. The old `Spark\Disk`, `Spark\Utils\Uploader`, and `Spark\Utils\S3Storage` names have no compatibility aliases; update those imports. The uploader's existing contracts and exception namespace remain compatible. The global `uploader()` helper does not accept `multiple` or `relativeTo`; use the concrete constructor/factory or a disk uploader for those options.
 
-Inject `Spark\Storage\Contracts\DiskContract` for application services. The application binds it to the default disk lazily, and default `Spark\Facades\Disk` calls resolve that binding. A provider may override it with a closure returning a selected disk. Named `disk()` calls and explicit `Disk::disk()` / `Disk::build()` construct disks directly.
+Inject `Spark\Storage\Disk` to let the container construct the default disk. Default `Spark\Facades\Disk` calls resolve that concrete class; a provider can bind it to a closure returning `Spark\Storage\Disk::disk('s3')`. The `Spark\Storage\Contracts\DiskContract` interface is not bound automatically: explicitly bind it before interface-based injection, for example to a closure resolving the concrete Disk service. Changing only the contract binding does not redirect facade calls. All `disk()` helper calls and explicit `Disk::disk()` / `Disk::build()` calls construct disks directly and bypass container bindings.
 
 S3 listing defaults to ListObjectsV2; configure `list_version: 1` only for legacy endpoints. Low-level `listFiles()` returns `next_marker`, which is an opaque continuation token for V2 and must be passed back unchanged. S3 copy is server-side, preserves metadata, and checks for error XML in successful HTTP responses before a move can delete its source. GET preserves content-encoded object bytes. Both upload and single copy are capped at 5 GiB; multipart operations are not implemented.
 
-Keep S3 ACLs null for policy-controlled AWS buckets and R2. R2 uses region `auto` and a path-style account endpoint. Spaces uses a regional origin; MinIO needs the deployment's own origin/region/addressing settings. Current storage tests use local fixtures, not live cloud accounts. Run an authorized disposable-prefix smoke test against the deployment's actual bucket/policy before release.
+Keep S3 ACLs null for policy-controlled AWS buckets and R2. R2 uses region `auto` and a path-style account endpoint. Spaces uses a regional origin; MinIO needs the deployment's own origin/region/addressing settings. Run an authorized disposable-prefix smoke test against the deployment's actual bucket/policy before release, including opening signed download URLs and checking their attachment filename.
