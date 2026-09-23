@@ -37,6 +37,14 @@
         "post-create-project-cmd": [
             "@php spark key:generate"
         ],
+        "setup": [
+            "composer install",
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php spark key:generate",
+            "@php spark migrate --seed",
+            "npm install",
+            "npm run build"
+        ],
         "test": "@php test"
     },
     "config": {
