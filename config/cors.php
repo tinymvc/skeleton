@@ -1,5 +1,10 @@
 <?php
 /**
+ * CORS configuration file.
+ * 
+ * The specified paths will be matched against the request path. 
+ * @var array [] = all paths and ['api/*', 'admin/*'] = specific paths
+ * 
  * The allowed origin. An asterisk (*) is a wildcard character that will match all origins.
  * @var string|array string: '*' or array:['https://example.com', ...]
  * 
@@ -16,6 +21,7 @@
  */
 
 return [
+    'paths' => [],
     'origin' => '*',
     'methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     'headers' => ['Content-Type', 'Authorization', 'X-Requested-With', 'X-XSRF-TOKEN'],

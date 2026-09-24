@@ -1,5 +1,9 @@
 .vscode
 .env
+.cursor
+.codex
+.idea
+.DS_Store
 vendor
 node_modules
 composer.lock
