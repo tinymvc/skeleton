@@ -1205,7 +1205,32 @@ $admin = $request->user(guard: 'admin');
 
 `Auth::register()` registers `auth.<guard>`; it does not register a user account. `default` is reserved and resolves `Spark\Http\Auth`, so customize that class binding rather than registering a guard named `default`. Use distinct session keys, cookie names, and cache names for independent guards. Selection does not change subsequent default `auth()` / `user()` calls. Blade supports `@auth('admin')` / `@guest('admin')`; use the same guard when reading the identity inside those blocks and in gate callbacks.
 
-Channels are checked in fixed order JWT, Basic, then session. Basic looks up `username`. JWTs identify the model, not the guard name; two guards using the same model/key are not separate token audiences. Regenerate the session after successful browser login. Guard logout clears its configured identity/cookie; session invalidation clears all guards sharing that session.
+Channels are checked in fixed order JWT, Basic, then session. Basic looks up `username` or `email`; both columns must exist when using that channel. JWTs identify the model, not the guard name; two guards using the same model/key are not separate token audiences. Regenerate the session after successful browser login. Guard logout clears its configured identity/cookie; session invalidation clears all guards sharing that session.
+
+JWT defaults are `jwt_expire: '3 months'` and `jwt_token_table: null`. The removed
+`validate_jwt_hash` option is not needed: stateless tokens require a SHA-256 `jti`
+fingerprint of the user's numeric ID, email, and stored password. Old MD5-based
+tokens need to be reissued. Keep payload overrides application-controlled.
+`getJwtToken($user, $payload = [])` only signs; `createJwtToken($payload = [])`
+requires the current user and additionally registers a row when a token table is
+configured. In that mode each token gets an independent random `jti`, and `exp`
+overrides also determine the stored expiry.
+
+For a configured `jwt_token_table`, create columns `user_id`, `token_hash` (unique
+string, 64 characters for generated IDs), `expire_at`, and `created_at`, with an
+optional primary `id` and the appropriate user foreign key. Use a separate table
+for different user models. `tokens()` returns the current user's stored rows;
+`revokeToken($tokenHash)` is scoped to that user. Both require the table and an
+authenticated user. `token()` returns the validated header's `jti`, not proof that
+the user/token row exists. Table-backed logout revokes the selected bearer token;
+stateless logout cannot revoke issued JWTs. Password changes require explicit
+revocation of table-backed tokens when the application wants that behavior.
+
+Auth validates signature, numeric subject, integer issue/expiry times, model
+provider, non-empty `jti`, and issuer origin (scheme/host/port). JWT-only guards
+should use `channels: ['jwt']`. `JWT::decode()` alone verifies the signature but
+does not apply these Auth checks. Registered token rows must exist and be unexpired;
+revocations apply to fresh request authentication, not an already-loaded identity.
 
 In the currently reviewed core checkout, `Foundation/Http/Middlewares/AuthMiddleware.php` is missing its namespace and strips `!` before testing negation. Do not assume the skeleton's namespaced parent or `auth:!admin` works. Use a standalone `MiddlewareInterface` implementation checking `auth($guard)->check()` (or `isGuest()` for guest routes) until the installed implementation is corrected. Register its alias in `bootstrap/middlewares.php` and use explicit guard names through downstream code.
 
