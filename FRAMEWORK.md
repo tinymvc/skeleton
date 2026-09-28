@@ -132,7 +132,7 @@ Views, console, events, facades, utilities, testing:
 - Carbon-like date utility: `./vendor/tinymvc/tinycore/src/Carbon.php`
 - Mail utility: `./vendor/tinymvc/tinycore/src/Utils/Mail.php`
 - HTTP client: `./vendor/tinymvc/tinycore/src/Http/Client/`
-- Upload/file/image utilities: `./vendor/tinymvc/tinycore/src/Storage/Uploader.php`, `./vendor/tinymvc/tinycore/src/Utils/FileManager.php`, `./vendor/tinymvc/tinycore/src/Utils/Image.php`
+- Upload/file/image utilities: `./vendor/tinymvc/tinycore/src/Storage/Uploader.php`, `./vendor/tinymvc/tinycore/src/Utils/File.php`, `./vendor/tinymvc/tinycore/src/Utils/Image.php`
 - Tracer/debugging: `./vendor/tinymvc/tinycore/src/Tracer.php`
 - Vite integration: `./vendor/tinymvc/tinycore/src/Utils/Vite.php`
 - Unit/Feature Testing: `vendor/tinymvc/tinycore/src/Testing/ApplicationTestCase.php`, `vendor/tinymvc/tinycore/src/Testing/Assert.php`, `vendor/tinymvc/tinycore/src/Testing/TestCase.php`
@@ -948,6 +948,7 @@ Other helpers are `hasOne`, `belongsTo`, and `hasManyThrough`. Specify keys for 
 
 - Nested eager loading: `with('posts.comments')` works directly; a keyed callback on that path constrains comments. Keep primary/foreign keys when selecting columns.
 - `load()` uses the lazy path and respects cached results / `lazy: false`. Use `with()` or static `loadRelations()` for explicit eager loading; `unsetRelation()` / `reloadRelations()` manage cached results.
+- `HasMany::create()`, `firstOrCreate()`, and `createOrUpdate()` accept arrays or `Arrayable` attributes, including `$request->validated()`. They call `toArray()` on `Arrayable` inputs before assigning the parent foreign key, leaving the input object unchanged. Custom `Arrayable` objects need neither array access nor iteration support. `HasOne` inherits these methods. Additional values and `createMany()` records remain arrays.
 - `hasMany()->create()` / `save()` assign the parent key; persist the parent first and allow the foreign key in the child fillable list. `hasOne` needs a unique database constraint for enforced one-to-one cardinality.
 - `belongsTo()->associate()` / `dissociate()` change the child object; call `save()` to persist.
 - Pivot operations: `attach`, `detach`, `sync`, `syncWithoutDetaching`, `toggle`, `updateExistingPivot`. `sync()` returns attached/detached IDs; update existing pivot attributes explicitly. `detach()` without IDs removes all associations for the parent, not related records. Wrap multi-step changes in a transaction when required.
@@ -1039,6 +1040,8 @@ The facade helper commits the callback result or rolls back/rethrows an exceptio
 
 
 ### Primary keys, aliases, and row locks
+
+`withAlias($column)` qualifies a bare column with the current read alias, or the effective `from()` / table name including `prefix()`. It trims surrounding whitespace, preserves already-qualified names (`p.created_at`, `users.id`) and SQL expressions, and qualifies quoted bare identifiers as well. `latest()` / `oldest()` use it, as do the default `id` orderings of `orderAsc()`, `orderDesc()`, and `last()`. Explicit qualifiers are kept exactly as supplied: use the actual SQL alias once a table has been aliased. This helper does not escape or validate raw SQL expressions; choose ordering expressions in application code. Primary-key and soft-delete predicates retain their separate compilation rules so reads use aliases and writes use physical tables.
 
 `Model::whereKey($id)` filters the model's primary key; an array produces an IN condition and an empty array matches no rows. `whereNotKey($id)` excludes one key with `!=`; an array uses NOT IN, and an empty array excludes nothing while preserving other conditions and model scopes. Both helpers support custom primary keys and relations. `find($id)` / `findOrFail($id)` use the same qualified condition. Read predicates use the current table alias, including an alias assigned after `whereKey()`. Relation builders target the related model's key while retaining the relation's parent/pivot conditions. Plain table queries should use an explicit `where('users.id', $id)`; they have no model key metadata.
 
@@ -1609,8 +1612,10 @@ if ($request->hasFile('avatar')) {
 Utilities:
 
 - `uploader()`
-- `filemanager()` or `fm()`
+- `Spark\Utils\File` for static local filesystem operations, or `fm()` returning a `File` instance
 - `image()`
+
+`Spark\Utils\File` replaces `Spark\Utils\FileManager`; update imports, type hints, and service bindings. The `filemanager()` helper was removed; use `fm()` instead. No old-name compatibility aliases are provided. File methods and storage configuration remain unchanged.
 
 Inspect existing app usage before implementing uploads.
 
