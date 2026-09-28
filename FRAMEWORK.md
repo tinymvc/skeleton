@@ -748,23 +748,27 @@ use Spark\Foundation\Http\Middlewares\CorsAccessControl;
 
 class Cors extends CorsAccessControl
 {
-    protected array $config = [
-        'origin' => ['https://example.com', 'https://*.example.com'],
-        'credentials' => true,
-        'age' => 600,
-        'methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        'headers' => ['Content-Type', 'Authorization', 'X-XSRF-TOKEN'],
-    ];
+    public function __construct()
+    {
+        parent::__construct([
+            'origin' => ['https://example.com', 'https://*.example.com'],
+            'credentials' => true,
+            'age' => 600,
+            'methods' => ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+            'headers' => ['Content-Type', 'Authorization', 'X-XSRF-TOKEN'],
+        ]);
+    }
 }
 ```
 
 Behavior:
 
-- Normal requests get CORS headers after the route response.
-- Valid preflight returns `204`.
-- Invalid preflight returns `403`.
+- Allowed origins receive CORS headers on normal responses, rendered validation/errors, early `send()` / `abort()` responses, and redirects once CORS middleware has run. Register it before middleware that can fail early.
+- Preflight requires OPTIONS plus both Origin and Access-Control-Request-Method headers. Ordinary OPTIONS requests continue normally. Valid preflight returns `204` without invoking the controller; requested HEAD matches GET routes.
+- Rejected preflight origins, methods, headers, and malformed method/header tokens return `403` when CORS middleware is reached. Normal disallowed-origin requests continue without access headers.
 - Wildcard origins such as `https://*.example.com` are supported.
 - `credentials => true` reflects concrete origins instead of using `*`.
+- Existing `Vary` values are preserved; CORS adds Origin, plus requested method/headers for preflight. Response preparation is cleared per request, and excluded paths/routes do not inherit prior CORS headers.
 
 ### CSRF
 
