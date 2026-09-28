@@ -612,18 +612,18 @@ public function store(StorePostRequest $request)
 Common validation rules:
 
 - `required`, `required_if`, `required_unless`
-- `present`, `filled`, `nullable`
+- `present`, `filled`, `nullable`, `sometimes`
 - `email`, `url`
 - `string`, `text`, `char`
 - `numeric`, `number`, `int`, `integer`
 - `array`, `list`
 - `min`, `max`, `size`, `between`
-- `same`, `confirmed`
+- `same`, `confirmed`, `gt`, `gte`, `lt`, `lte` (`ls` / `lse` aliases)
 - `in`, `not_in`
 - `regex`
 - `unique`, `exists`, `not_exists`
 - `boolean`, `float`, `decimal`
-- `alpha`, `alpha_num`, `alpha_dash`
+- `alpha`, `alpha_num`, `alpha_dash`, their `:ascii` forms, and `ascii`
 - `digits`, `digits_between`, `min_digits`, `max_digits`
 - `date`, `date_format`, `before`, `after`
 - `json`, `ip`, `ipv4`, `ipv6`, `mac_address`, `uuid`
@@ -644,6 +644,30 @@ $request->except(['password']);
 $request->safe('body', ['p', 'strong']);
 $request->input()->boolean('published'); // Input wrapper; this does not validate the field
 ```
+
+### Optional fields, nested rules, and validated values
+
+```php
+$data = $request->validate([
+    'username' => ['sometimes', 'string', 'alpha_dash', 'min:3', 'max:30',
+        ['unique' => ['users', 'username', auth()->id()]]],
+    'share_method' => ['nullable', 'string', ['in' => ['copy_link', 'native_share', 'message']]],
+    'settings' => 'sometimes|array',
+    'settings.allow_share' => 'sometimes|required|boolean',
+    'items' => 'required|array|max:50',
+    'items.*.name' => 'required|string|max:100',
+    'minimum' => 'required|numeric',
+    'maximum' => 'required|numeric|gt:minimum',
+]);
+```
+
+`sometimes` skips every rule for an absent key. `nullable` permits a present null and skips non-presence rules; it does not override `required`. `filled` rejects supplied empty values, `present` requires the key, and `prohibited` accepts absence or emptiness. Required accepts `0`/`false`. Optional blank strings skip non-presence checks and are not automatically converted to null. Apply presence rules to the parent array and each required child; wildcards expand existing entries. Child rules filter the returned keys of explicitly validated array parents. Errors use concrete dot paths; wildcard messages are supported. Escape literal dots in keys.
+
+Parameter arrays (`['in' => [...]]`, `['unique' => [$table, $column, $authorizedId]]`) preserve lists and string parameters retain case. Unique ignores a numeric `id`, with no custom ignore-column parameter. Field comparisons measure compatible numbers, string lengths, array counts, or uploaded KB; use min/max for literal limits. ASCII validation uses `Str::isAscii()` and needs `voku/portable-ascii`; it rejects rather than transliterates. Unknown rules still pass, integer uses `is_numeric()`, and Laravel Rule objects/bail are unsupported.
+
+`validated()` returns `Input`, even for an empty successful result; `validated($key, $default)` reads a top-level key. Use `Spark\Support\Arr::get($data->toArray(), 'settings.allow_share')` for nested retrieval. Validation failure throws `Spark\Foundation\Exceptions\ValidationException`, replacing `ValidationErrorException`; the application formats JSON 422, browser redirects, or FireLine errors. Browser input flashing requires care with sensitive fields.
+
+Request `integer()`, `float()`, and `boolean()` conversions preserve zero/false instead of replacing them with a default. They do not replace validation. `bearerToken()` returns a token from a valid case-insensitive Bearer header, otherwise null.
 
 ## Middleware
 
@@ -901,6 +925,8 @@ Model behavior to preserve:
 - Override protected `events(): Spark\Database\Events` for `created`, `updated`, `deleted`, and `changed` callbacks. They receive no arguments; use `$this`. Bulk builder writes do not dispatch per-row callbacks, and callbacks are not deferred until commit.
 - Add public `scopePublished(QueryBuilder $query)` methods for reusable conditions, then call `Post::published()`. Unknown builder methods may execute a query and forward to a Collection.
 
+`getAttributes()` / `getAttribute()` read raw attributes; `hasAttribute()` detects present nulls. `setAttributes()` replaces raw attributes without fill/cast/persistence tracking. `is($other)` strictly compares table, key name, and value, not persisted existence. Instance increment/decrement use the original key and synchronize the in-memory counter after success.
+
 ## Relationships
 
 Declare public relationship methods using the model's protected helpers:
@@ -929,6 +955,8 @@ Other helpers are `hasOne`, `belongsTo`, and `hasManyThrough`. Specify keys for 
 - `withCount('posts')` adds `posts_count`; `withSum('posts', 'views')` adds `posts_sum`. Supply aliases to avoid collisions. Use `has()` for parent count filtering; extra comparison arguments on `withCount()` do not implement that filtering.
 - `morphWith()` uses an explicit map such as `['post' => ['class' => Post::class, 'relations' => ['user']]]`; do not assume `morphTo()` / `morphMany()` helpers exist.
 - Related reads, direct relation `count()`, `has()` / `whereHas()`, and `withCount()` / other aggregates apply the related model's soft-delete scope by default. Use `withTrashed()` / `onlyTrashed()` in each related-query callback to override it. Parent scopes do not propagate to children; see [Soft deletes](#soft-deletes) for joined-table boundaries.
+
+`withExists('posts')` adds `posts_exists` as a 0/1 value; aliases (`'posts as has_posts'`) and callbacks are supported with related soft-delete scopes. `load()` and `reloadRelations()` return the same model for chaining.
 
 ## Query Builder
 
@@ -995,6 +1023,8 @@ Use a fresh builder for each operation or `copy()` before execution. Retrieval r
 
 For nontrivial JSON/date-part SQL, inspect the driver-specific implementation. JSON helpers use field/key/value and text matching on all three drivers; use dot-separated object paths for portable cases. Date-part helpers extract DATE/YEAR/MONTH on all three drivers. Test on the production driver when depending on these differences.
 
+Paginator JSON now contains `current_page`, `data`, `first_page_url`, `from`, `last_page`, `last_page_url`, `links`, `next_page_url`, `path`, `per_page`, `prev_page_url`, `to`, and `total`. Old page/limit methods remain; JSON keys changed. `Paginator::make()` constructs it, and `currentPage()`, `perPage()`, `lastPage()`, `hasMorePages()`, `hasPages()`, `onFirstPage()`, `onLastPage()`, `url()`, `previousPageUrl()`, and `nextPageUrl()` expose navigation. `links` retains Spark link-entry shapes. `through($callback)` returns a mapped array without mutating stored data. Full-array `data(slice: true)` also does not mutate data before serialization.
+
 ### Connections and transactions
 
 ```php
@@ -1006,6 +1036,46 @@ $result = DB::transaction(function () use ($userId) {
 ```
 
 The facade helper commits the callback result or rolls back/rethrows an exception. It uses the application connection, creates savepoints for nested calls, and has no retry loop. Never manually finish/reconnect the transaction or use implicitly committing DDL inside a callback. `Spark\Database\DB::connection($configOrName)` creates a separate wrapper; use its `table()` and transaction methods consistently. Creating another wrapper does not move models or Schema to it. Schema refreshes its cached PDO/grammar when the application DB is replaced. `connect_db()` returns a builder. `reset()` / `resetPdo()` replace connection state and must not interrupt a transaction.
+
+
+### Primary keys, aliases, and row locks
+
+`Model::whereKey($id)` filters the model's primary key; an array produces an IN condition and an empty array matches no rows. `whereNotKey($id)` excludes one key with `!=`; an array uses NOT IN, and an empty array excludes nothing while preserving other conditions and model scopes. Both helpers support custom primary keys and relations. `find($id)` / `findOrFail($id)` use the same qualified condition. Read predicates use the current table alias, including an alias assigned after `whereKey()`. Relation builders target the related model's key while retaining the relation's parent/pivot conditions. Plain table queries should use an explicit `where('users.id', $id)`; they have no model key metadata.
+
+Existing model instance writes and locked reads use the original primary value, grouped outside caller OR conditions. Changing an in-memory primary key does not retarget that instance operation. Write predicates target the physical table; this does not add portable joined-update support. Qualify your own ambiguous join columns explicitly.
+
+```php
+use Spark\Facades\DB;
+
+DB::transaction(function () use ($userId) {
+    $user = User::whereKey($userId)->lockForUpdate()->firstOrFail();
+    $user->increment('credits', 1);
+});
+```
+
+`lockForUpdate()` requests an exclusive SELECT lock. `sharedLock()` (or `lock(false)`) requests a shared lock; **false does not disable locking**. `lock(null)` removes the lock clause. MySQL uses `FOR UPDATE` / `LOCK IN SHARE MODE`; PostgreSQL uses `FOR UPDATE` / `FOR SHARE`; SQLite emits no row-lock clause. SQLite transactions do not provide equivalent row-level locking. `lock($trustedSql)` accepts a raw, driver-specific clause.
+
+Lock methods only configure a builder. Execute the SELECT inside a transaction and perform subsequent writes on the same connection before committing. `User::findOrFail($id)->lockForUpdate()->firstOrFail()` scopes the second read to the instance's original key; reading it again under the lock is essential. Prefer the single-read example above. New instances without an original primary value need an explicit condition. Locks do not make lookup-then-insert helpers race-free; retain unique constraints. Avoid lock clauses on aggregates/grouped/union queries unless supported by the target database.
+
+`Spark\Database\DB::connection($configOrName)->transaction($callback)` passes that concrete connection to the callback and returns its result. The facade transaction uses the application connection. Nested calls use savepoints, failures roll back and rethrow, and neither form retries deadlocks automatically. Queries, models, and schema operations must use the intended connection; creating a separate wrapper does not rebind model queries.
+
+### Subqueries
+
+`whereIn($column, $values)`, `whereNotIn()`, `orWhereIn()`, and `orWhereNotIn()` accept `array|string|QueryBuilder|Closure`. Arrays remain bound value lists; the other forms delegate to `whereInSub()` with the corresponding IN/NOT IN and AND/OR behavior. Strings are trusted subquery SQL, not comma-separated values: use `['published']` for a single literal. Empty IN arrays match nothing; empty NOT IN arrays exclude nothing.
+
+`selectSub($subquery, $alias)`, `whereInSub($column, $subquery)`, and `whereNotInSub($column, $subquery)` accept a builder, a closure, or trusted SQL. Builder bindings are imported with distinct parameter names. Closure arguments receive a builder on the same connection; set its table explicitly for a different table.
+
+```php
+$authors = query('posts')->select('user_id')->where('published', true);
+$users = query('users')->whereIn('id', $authors)->all();
+
+$usersWithPosts = query('users')->whereExists(function ($sub) {
+    $sub->table('posts')->selectRaw('1')
+        ->whereColumn('posts.user_id', 'users.id');
+})->all();
+```
+
+`whereExists($subquery, $boolean = 'AND', $not = false)` and `whereNotExists($subquery, $boolean = 'AND')` accept the subquery directly, without a column argument. EXISTS applies to the subquery as a whole; correlate it explicitly with `whereColumn()` as above. Remove the former leading column argument when upgrading. OR variants (`orWhereInSub`, `orWhereNotInSub`, `orWhereExists`, `orWhereNotExists`) are available. Prefer `whereHas()` for model relationships and their built-in scopes.
 
 ## Migrations and Schema
 
@@ -1056,8 +1126,10 @@ $table->string('email')->unique();
 $table->text('body')->nullable();
 $table->boolean('active')->default(true);
 $table->timestamp('published_at')->nullable();
-$table->foreignId('user_id', nullable: true)->constrained()->setNullOnDelete(); // default: nullable=false
+$table->foreignId('user_id')->nullable()->constrained()->setNullOnDelete(); // default: nullable=false
 ```
+
+Column `primary()`, `index()`, `unique()`, `fullText()`, and `spatialIndex()` register indexes on the containing blueprint; driver support varies. Foreign-key builders support `nullable()`, `required()`, `default()`, and `after()` on their attached single column. `foreign('user_id')` finds that named declared column, not the most recently added column; existing/composite columns require separately defined modifiers.
 
 ### Generating and applying migrations
 
@@ -1072,7 +1144,7 @@ php spark migrate:rollback --step=1
 
 The runner records applied filenames in `database/migrations.json`. Preserve that file with its database. Files use `migration_` / `seed_` prefixes; `php spark make:seeder Name` and `php spark migrate --seed` handle seed files. `migrate:fresh` rolls back recorded migrations and replays them; it is destructive, not a read-only verification command.
 
-Create new migrations for deployed schemas instead of rewriting history. Failures can leave partial DDL because the runner does not automatically wrap each file in a transaction. On SQLite, adding/removing foreign keys or primary keys from existing tables needs a deliberate rebuild; there is no `change()` column modifier. Most type methods do not imply NOT NULL: call `required()` for required fields. Use `nullable: true` on `foreignId()` before `setNullOnDelete()`.
+Create new migrations for deployed schemas instead of rewriting history. Failures can leave partial DDL because the runner does not automatically wrap each file in a transaction. On SQLite, adding/removing foreign keys or primary keys from existing tables needs a deliberate rebuild; there is no `change()` column modifier. Most type methods do not imply NOT NULL: call `required()` for required fields. Chain `nullable()` on `foreignId()` before `setNullOnDelete()`.
 
 ## Soft Deletes
 
@@ -1211,7 +1283,7 @@ JWT defaults are `jwt_expire: '3 months'` and `jwt_token_table: null`. The remov
 `validate_jwt_hash` option is not needed: stateless tokens require a SHA-256 `jti`
 fingerprint of the user's numeric ID, email, and stored password. Old MD5-based
 tokens need to be reissued. Keep payload overrides application-controlled.
-`getJwtToken($user, $payload = [])` only signs; `createJwtToken($payload = [])`
+`makeToken($user, $payload = [])` only signs; `createToken($payload = [])`
 requires the current user and additionally registers a row when a token table is
 configured. In that mode each token gets an independent random `jti`, and `exp`
 overrides also determine the stored expiry.
@@ -1232,7 +1304,7 @@ should use `channels: ['jwt']`. `JWT::decode()` alone verifies the signature but
 does not apply these Auth checks. Registered token rows must exist and be unexpired;
 revocations apply to fresh request authentication, not an already-loaded identity.
 
-In the currently reviewed core checkout, `Foundation/Http/Middlewares/AuthMiddleware.php` is missing its namespace and strips `!` before testing negation. Do not assume the skeleton's namespaced parent or `auth:!admin` works. Use a standalone `MiddlewareInterface` implementation checking `auth($guard)->check()` (or `isGuest()` for guest routes) until the installed implementation is corrected. Register its alias in `bootstrap/middlewares.php` and use explicit guard names through downstream code.
+`Spark\Foundation\Http\Middlewares\AuthMiddleware` is namespaced and accepts any matching guard, including negated names such as `auth:!admin`. Extend it and override `failed(Request $request, array $guards)` for custom failure responses; the default aborts with 401. Register its alias in `bootstrap/middlewares.php`. Guard matching does not switch the default identity for downstream code.
 
 Gate:
 
@@ -1250,6 +1322,8 @@ authorize('update-post', $post); // throws AuthorizationException on deny
 ```
 
 `AuthorizationException` is mapped to HTTP 403. Gate forwards only the supplied arguments; it does not automatically inject the authenticated user. Read `auth()->user()` in the callback or pass the user explicitly.
+
+Current JWT methods are `makeToken($user, $payload)` (sign only) and `createToken($payload)` (current user, register when configured), replacing `getJwtToken()` / `createJwtToken()`. `tokens()` lists the user's registered tokens; `token()` exposes a verified bearer jti but does not replace authentication. `revokeToken($hash = null)` defaults to the current bearer identifier and remains owner-scoped.
 
 ## Cache
 
@@ -1539,6 +1613,16 @@ Utilities:
 - `image()`
 
 Inspect existing app usage before implementing uploads.
+
+### S3 direct uploads and downloads
+
+`storage('s3')->temporaryUploadUrl($key, $seconds = 300, $contentType = null, $acl = null)` returns a signed PUT URL (expiry 1–604800 seconds). Send a raw body, with matching Content-Type and x-amz-acl headers when supplied. ACL is explicit, not inferred from disk config. Authorize the key and configure bucket CORS for browser uploads. The URL does not run uploader validation. `downloadFile($key, $localPath)` streams to a temporary file then replaces the local destination on success; failures preserve existing content. The wrapper creates parents. These APIs are S3-only.
+
+`storage('s3')->storage()` exposes the underlying client (local disks return `LocalStorage`); it differs from the uploader `getDriver()`. Low-level `S3Storage::moveFile()` copies then deletes; `deleteDirectory($prefix)` deletes a paginated raw prefix and returns the count. It is not on the disk interface. An empty prefix is rejected; `reports/` scopes a directory while `reports` also matches `reports-old.csv`. Neither operation is atomic and versioned buckets can retain historical versions.
+
+### Dates
+
+Carbon `setTimezone()` preserves an instant; `shiftTimezone()` preserves wall-clock values while changing the instant. Both return a new value. `modify()` accepts a string or closure receiving the copied internal `DateTime`; mutate the argument, since its return value is ignored. ISO helpers are `toIsoString()` and `toIsoUtcString()`.
 
 ## Mail and HTTP Client
 
