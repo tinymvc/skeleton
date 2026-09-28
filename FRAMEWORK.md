@@ -1286,7 +1286,7 @@ JWT defaults are `jwt_expire: '3 months'` and `jwt_token_table: null`. The remov
 `validate_jwt_hash` option is not needed: stateless tokens require a SHA-256 `jti`
 fingerprint of the user's numeric ID, email, and stored password. Old MD5-based
 tokens need to be reissued. Keep payload overrides application-controlled.
-`makeToken($user, $payload = [])` only signs; `createToken($payload = [])`
+`makeToken($user, $payload = [])` only signs; `createToken(?Model $user = null, $payload = [])`
 requires the current user and additionally registers a row when a token table is
 configured. In that mode each token gets an independent random `jti`, and `exp`
 overrides also determine the stored expiry.
@@ -1326,7 +1326,7 @@ authorize('update-post', $post); // throws AuthorizationException on deny
 
 `AuthorizationException` is mapped to HTTP 403. Gate forwards only the supplied arguments; it does not automatically inject the authenticated user. Read `auth()->user()` in the callback or pass the user explicitly.
 
-Current JWT methods are `makeToken($user, $payload)` (sign only) and `createToken($payload)` (current user, register when configured), replacing `getJwtToken()` / `createJwtToken()`. `tokens()` lists the user's registered tokens; `token()` exposes a verified bearer jti but does not replace authentication. `revokeToken($hash = null)` defaults to the current bearer identifier and remains owner-scoped.
+Current JWT methods are `makeToken($user, $payload)` (sign only) and `createToken($user, $payload)` (current user, register when configured), replacing `getJwtToken()` / `createJwtToken()`. `tokens()` lists the user's registered tokens; `token()` exposes a verified bearer jti but does not replace authentication. `revokeToken($hash = null)` defaults to the current bearer identifier and remains owner-scoped.
 
 ## Cache
 
