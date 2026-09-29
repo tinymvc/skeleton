@@ -669,6 +669,10 @@ Parameter arrays (`['in' => [...]]`, `['unique' => [$table, $column, $authorized
 
 Request `integer()`, `float()`, and `boolean()` conversions preserve zero/false instead of replacing them with a default. They do not replace validation. `bearerToken()` returns a token from a valid case-insensitive Bearer header, otherwise null.
 
+`acceptedTypes()` maps MIME types to quality weights, highest first; ties preserve header order. `accept($mime)` requires an explicit positive-quality entry. `accepts($mime)` also honors wildcards and specific `q=0` rejections. Invalid quality weights are zero; media parameters other than `q` are not distinguished. `wantsJson()` checks the highest-ranked acceptable `/json` or `+json` type. `acceptsAnyContentType()` checks a missing/empty Accept header or a preferred positive global wildcard. `expectsJson()` also supports AJAX wildcard requests unless JSON is explicitly rejected, and always treats `/api`, `/api/...`, `/webhook`, `/webhook/...` as JSON paths.
+
+`ip()` trusts forwarded IPs only from peers matching `app.trusted_proxies` (IPv4/IPv6 addresses or CIDRs; skeleton environment: comma-separated `TRUSTED_PROXIES`). The default `app.trusted_proxy_header` is `x-forwarded-for`: scan right to left to the first untrusted address, or use the leftmost when all hops are trusted. Invalid masks never grant trust; malformed chains fall back to the peer. `CF-Connecting-IP` requires explicit `trusted_proxy_header: 'cf-connecting-ip'` / `TRUSTED_PROXY_HEADER` and trusted peers that overwrite that header. Use `'*'` only behind a proxy that sanitizes forwarding data and blocks direct access. These settings affect client IP, not scheme or host.
+
 ## Middleware
 
 Middleware implements `Spark\Contracts\Http\MiddlewareInterface`.
@@ -1290,8 +1294,12 @@ JWT defaults are `jwt_expire: '3 months'` and `jwt_token_table: null`. The remov
 `validate_jwt_hash` option is not needed: stateless tokens require a SHA-256 `jti`
 fingerprint of the user's numeric ID, email, and stored password. Old MD5-based
 tokens need to be reissued. Keep payload overrides application-controlled.
-`makeToken($user, $payload = [])` only signs; `createToken(?Model $user = null, $payload = [])`
-requires the current user and additionally registers a row when a token table is
+`makeToken($user, $payload = [])` only signs; `createToken(?Model $user = null, array $payload = [])`
+uses the explicit user or falls back to the guard's current user. A guest can issue
+a token for an explicitly supplied, authorized user; issuance does not log in or
+switch the current identity. Omitting the user as a guest throws. Pass payloads as
+the second argument or use `createToken(payload: [...])`, not a positional array
+as the first argument. It additionally registers a row when a token table is
 configured. In that mode each token gets an independent random `jti`, and `exp`
 overrides also determine the stored expiry.
 
@@ -1330,7 +1338,7 @@ authorize('update-post', $post); // throws AuthorizationException on deny
 
 `AuthorizationException` is mapped to HTTP 403. Gate forwards only the supplied arguments; it does not automatically inject the authenticated user. Read `auth()->user()` in the callback or pass the user explicitly.
 
-Current JWT methods are `makeToken($user, $payload)` (sign only) and `createToken($user, $payload)` (current user, register when configured), replacing `getJwtToken()` / `createJwtToken()`. `tokens()` lists the user's registered tokens; `token()` exposes a verified bearer jti but does not replace authentication. `revokeToken($hash = null)` defaults to the current bearer identifier and remains owner-scoped.
+Current JWT methods are `makeToken($user, $payload)` (sign only) and `createToken(?Model $user = null, array $payload = [])` (explicit or current user, register when configured), replacing `getJwtToken()` / `createJwtToken()`. `tokens()` lists the user's registered tokens; `token()` exposes a verified bearer jti but does not replace authentication. `revokeToken($hash = null)` defaults to the current bearer identifier and remains owner-scoped.
 
 ## Cache
 
@@ -1577,6 +1585,37 @@ return response('', 204);
 For APIs, returning arrays is acceptable because `Response::send()` JSON encodes arrays.
 
 For explicit JSON status codes, prefer `json($data, $status)`.
+
+### JSON resources
+
+Extend `Spark\Http\Resources\JsonResource` and override `toArray(?Request $request = null): array`.
+Read model/array/object fields with `$this->field`. Return `UserResource::make($user)`
+directly, `response($resource, 201)`, or `$resource->response(201, $headers)`.
+`UserResource::collection($items)` handles arrays, iterables, and `Paginator`; its
+`ResourceCollection` reindexes keys unless `->preserveKeys()` is set. Generators
+are materialized. Pagination transforms current-page items and adds `data`, `links`,
+and `meta` without modifying the paginator.
+
+Use `when()`, `unless()`, `whenNotNull()`, `whenHas()`, `whenLoaded()`, and
+`whenCounted()` to omit conditional fields. Wrap conditional work in closures.
+For loaded relations use `$this->whenLoaded('posts', fn($posts) => PostResource::collection($posts))`;
+this never lazy-loads. Loaded null relations stay null, and count zero is retained.
+Omitted defaults remove fields; explicit null defaults retain them. Group optional
+fields with `...$this->when($condition, fn() => ['extra' => $value], [])`.
+
+Top-level resources default to a `data` wrapper. Use instance methods `wrap('user')`,
+`withoutWrapping()`, and `additional(['meta' => ...])`; reusable metadata comes from
+`with(?Request $request = null): array`. Metadata forces a wrapper, and paginated
+collections always use `data`, `links`, `meta`. Nested resources are unwrapped.
+`resolve()` and `toJson()` produce filtered, unwrapped data; `responseData()` builds
+the HTTP document. `json()` still accepts arrays: use `json(['user' => $resource])`
+for nesting. Base resources honor model serialization; explicit field selection
+can expose hidden model fields, so select only authorized output.
+
+`JsonResource::normalize($value, $request = null)` provides the same recursive
+conversion used by `Response` JSON serialization, including conditional omission,
+collections, dates, URLs, and nested resources. It returns unwrapped data;
+top-level resource envelopes remain the responsibility of `responseData()`.
 
 ## Files and Uploads
 

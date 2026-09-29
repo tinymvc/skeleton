@@ -28,4 +28,6 @@ return [
             explode(',', env('TRUSTED_PROXIES', ''))
         )
     ),
+    // Select cf-connecting-ip only when trusted peers overwrite that header.
+    'trusted_proxy_header' => env('TRUSTED_PROXY_HEADER', 'x-forwarded-for'),
 ];
