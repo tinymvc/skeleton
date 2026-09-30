@@ -935,6 +935,36 @@ Model behavior to preserve:
 
 `getAttributes()` / `getAttribute()` read raw attributes; `hasAttribute()` detects present nulls. `setAttributes()` replaces raw attributes without fill/cast/persistence tracking. `is($other)` strictly compares table, key name, and value, not persisted existence. Instance increment/decrement use the original key and synchronize the in-memory counter after success.
 
+### Model action return values, tap, and pipe
+
+`Model::create()` returns a model, `fill()` / `refresh()` return the same model, and `save()` / `remove()` return booleans. Forwarded instance `update()` and query-builder `update()` / `delete()` return affected-row counts. Inspect the installed implementation before chaining a write into a resource or another model action.
+
+Use global `tap()` to keep the original model after actions:
+
+```php
+$post = tap(Post::findOrFail($id), function (Post $post) use ($validated): void {
+    $post->fill($validated);
+
+    if (! $post->save()) {
+        throw new \RuntimeException('Unable to save the post.');
+    }
+});
+```
+
+The callback runs immediately; its result is discarded. Exceptions propagate. `tap()` does not save automatically, refresh attributes, validate input, start a transaction, or guarantee write success. `create()` already returns a model and needs no wrapper unless more work follows; it internally ignores the boolean from `save()`. Use explicit `fill()` / `save()` and check the result when necessary.
+
+`tap($post)->save()` returns the model and discards the boolean. This proxy applies to one call: `tap($post)->fill($validated)->save()` returns the ordinary `save()` boolean. Use the callback form for multiple steps or write-result checks. `tap($post->save(), ...)` receives a boolean, not a model.
+
+Global `pipe($value, $callback)` instead returns the callback result unchanged:
+
+```php
+$title = pipe($post, fn (Post $post): string => $post->title);
+```
+
+It accepts one required callback and preserves results such as `null`, `false`, and objects. It does not evaluate a closure-valued input or output automatically. `with($value, $callback)` provides the same transformation behavior and additionally permits omitting the callback. Verify that the installed package includes the newer global `pipe()` before using it.
+
+Models and query builders have no native instance `tap()` / `pipe()` methods. Use the global helpers or ordinary local variables. Collections already have `tap()`, `pipe()`, and `pipeThrough()`; collection `tap()` requires a callback. `Stringable::pipe()` wraps its result in a new Stringable. `Pipeline::pipe()` adds stages to a pipeline. Do not substitute these APIs without checking their different contracts.
+
 ## Relationships
 
 Declare public relationship methods using the model's protected helpers:

@@ -15,6 +15,35 @@ Develop against the project's installed TinyCore APIs and existing application c
 
 Do not update dependencies, replace the frontend/test stack, or modify unrelated configuration merely to match an example in this skill.
 
+## Required coding style
+
+Use Laravel-style PHP formatting with Spark's actual APIs. These are required conventions for new and edited code, not permission to import Illuminate or rewrite unrelated files.
+
+- Use four spaces, never tabs. Put class and method opening braces on the next line; put control-flow and closure opening braces on the same line. Always use braces for control flow.
+- Keep one statement per line. Never compress methods, guards, loops, or multiple assignments onto one line. Use blank lines between methods, properties, and distinct steps such as validation, persistence, and response construction. Avoid blank lines between every statement in one coherent step.
+- Break long query chains onto separate lines with one call per line. Expand long arrays and argument lists, with one entry per line and a trailing comma. Keep short, obvious expressions on one line; do not optimize for the fewest lines.
+- Use spaces around operators, after commas, and in `fn (Type $value) => ...`. Prefer single quotes for literal strings and double quotes when interpolation is needed.
+- Use descriptive names, explicit visibility, and parameter/return types wherever the real contract permits. Import classes at the top; keep imports organized and remove unused ones. Preserve established import grouping when it remains readable.
+- Prefer guard clauses, focused methods, and direct expressions. Use arrow functions for a single expression and full closures for multiple steps. Avoid nested ternaries, clever side effects in conditions, redundant wrappers, and comments that merely repeat the code.
+- Use Spark's native validation, resources, relations, scopes, `Arr`, `Str`, collections, helpers, and services before writing a replacement. Inspect the installed implementation first. A native feature is preferred when it fits the requirement; a simple PHP expression is better than an unnecessary abstraction.
+- Add services or reusable abstractions only when they clarify a real responsibility or remove meaningful repetition. Keep controllers readable without scattering a short operation across many classes.
+
+For model actions, inspect return values before chaining. `create()` and `fill()` return a model; `save()` / `remove()` return booleans; query `update()` / `delete()` return affected-row counts. Use global `tap($model, $callback)` to retain the model and `pipe($value, $callback)` to return a transformation result, when available in the installed version. Models do not provide native instance `tap()` or `pipe()` methods. Do not add these calls based on Laravel familiarity. `tap()` ignores callback return values, so explicitly handle a failed `save()` when success is required. Ordinary local variables are equally appropriate when clearer.
+
+```php
+$post = tap(Post::findOrFail($id), function (Post $post) use ($validated): void {
+    $post->fill($validated);
+
+    if (! $post->save()) {
+        throw new RuntimeException('Unable to save the post.');
+    }
+});
+
+return PostResource::make($post);
+```
+
+Here `Post`, `PostResource`, and `RuntimeException` are imported classes, and `$validated` is already validated and authorized input. See [model action return values](../../../FRAMEWORK.md#model-action-return-values-tap-and-pipe) for proxy semantics and persistence caveats.
+
 ## Load the relevant guidance
 
 Paths below are relative to the skill folder. Reference source paths in `FRAMEWORK.md` are relative to the application root.
@@ -49,5 +78,7 @@ If the installed package lacks a required API, identify the gap and use a suppor
 Use existing verification tools. PHP application changes normally need `php -l` on changed files and relevant tests through `php test --filter=Name` or `composer test -- --filter=Name`. Check `tests/config.php` and the test base before relying on database isolation. Run the full suite when changing shared behavior; build frontend assets when they change.
 
 For database work, verify stored data and affected rows, not only response status. For soft deletes, cover active/archived rows, owner boundaries, restoration, purging, and any custom column or relationship used. SQLite success does not establish MySQL/PostgreSQL parity for driver-specific behavior.
+
+Before handing off, review changed code for the formatting rules above, unnecessary abstractions, invented Laravel APIs, and duplicated native Spark behavior. Fix compact or crowded code in the lines you changed.
 
 Inspect the diff for unintended changes. Report the resulting behavior, tests actually run, and concrete remaining limitations. Update affected guidance when changing a public API; keep frozen documentation versions independent. Do not treat illustrative purge, migration, worker, or external-service commands as instructions to run against live data.
