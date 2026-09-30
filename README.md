@@ -1,11 +1,17 @@
-# TinyMVC Framework
+<p align="center">
+    <img width="1216" height="415" alt="tinymvc-spark" src="https://github.com/user-attachments/assets/c167c5d0-f946-440a-b5fa-012a63cd7910" />
+</p>
 
-[![Latest Version](https://img.shields.io/github/v/release/tinymvc/skeleton?style=flat-square)](https://github.com/tinymvc/skeleton/releases)
-[![License](https://img.shields.io/github/license/tinymvc/skeleton?style=flat-square)](https://github.com/tinymvc/skeleton/blob/main/LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/tinymvc/skeleton?style=flat-square)](https://github.com/tinymvc/skeleton/stargazers)
-[![Open Issues](https://img.shields.io/github/issues-raw/tinymvc/skeleton?style=flat-square)](https://github.com/tinymvc/issues)
+<p align="center">
+<a href="https://github.com/tinymvc/tinycore/releases"><img src="https://img.shields.io/github/v/release/tinymvc/tinycore?style=flat-square" alt="Latest Version"></a>
+<a href="https://github.com/tinymvc/tinycore/stargazers"><img src="https://img.shields.io/github/stars/tinymvc/tinycore?style=flat-square" alt="GitHub Stars"></a>
+<a href="https://packagist.org/packages/tinymvc/tinycore"><img src="https://img.shields.io/packagist/dt/tinymvc/tinycore" alt="Total Downloads"></a>
+<a href="https://packagist.org/packages/tinymvc/tinycore"><img src="https://img.shields.io/packagist/l/tinymvc/tinycore" alt="License"></a>
+</p>
 
-**A minimalist PHP MVC framework for modern web artisans**  
+<hr/>
+
+**A minimalist MVC PHP framework for modern web artisans**  
 Lightning-fast · Elegant Syntax · Developer Friendly
 
 ## Key Features
@@ -64,9 +70,9 @@ Full documentation is available at: [https://tinymvc.github.io](https://tinymvc.
 We welcome contributions! Please:
 
 1. ⭐ Star the repository
-2. 🐞 Report issues [here](https://github.com/tinymvc/issues)
-3. 🛠 Submit PRs following our [contribution guidelines](https://tinymvc.github.io/contribution)
+2. 🐞 Report issues [here](https://github.com/tinycore/issues)
+3. 🛠 Submit PRs following our [contribution guidelines](https://tinymvc.github.io/#/docs/contributing)
 
 ## License
 
-TinyMVC is open-source software licensed under the [MIT License](https://github.com/tinymvc/skeleton/blob/main/LICENSE).
+TinyMVC is open-source software licensed under the [MIT License](https://github.com/tinymvc/tinycore/blob/main/LICENSE).
