@@ -8,8 +8,6 @@ return new class {
     {
         Schema::create('sessions', function (Blueprint $table) {
             $table->string('id')->primary();
-            $table->string('ip_address', 45)->nullable();
-            $table->string('user_agent', 512)->nullable();
             $table->longText('payload');
             $table->integer('last_activity')->index();
         });
