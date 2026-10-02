@@ -1,12 +1,27 @@
 <?php
 
 return [
-    'driver' => env('CACHE_DRIVER', 'sqlite'),
+    'driver' => env('CACHE_DRIVER', 'database'),
     'connections' => [
-        'sqlite' => [
-            'path' => dirname(__DIR__) . '/storage/cache',
+        'database' => [
+            'driver' => 'database',
+            'table' => env('DB_CACHE_TABLE', 'caches'),
+            'connection' => env('DB_CACHE_CONNECTION'),
+            'lock_connection' => env('DB_LOCK_CONNECTION'),
+            'lock_table' => env('DB_LOCK_TABLE', 'locks'),
+        ],
+        'file' => [
+            'driver' => 'file',
+            'path' => dirname(__DIR__) . '/storage/temp/cache',
+            'lock_path' => dirname(__DIR__) . '/storage/temp/locks',
+            'file_mode' => 0664,
+            'dir_mode' => 0775,
+            'fsync' => false,          // true = survive power loss, slower
+            'guard_timeout' => 5.0,    // max seconds to wait for a shard guard
+            'gc_interval' => 300,      // throttle for has()/retrieve($eraseExpired) sweeps
         ],
         'redis' => [
+            'driver' => 'redis',
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'port' => env('REDIS_PORT', 6379),
             'password' => env('REDIS_PASSWORD', null),

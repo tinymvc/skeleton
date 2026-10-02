@@ -8,8 +8,7 @@ return new class {
         User::firstOrCreate(
             attributes: ['email' => 'admin@mail.com'],
             values: [
-                'first_name' => 'John',
-                'last_name' => ' Doe',
+                'name' => 'John Doe',
                 'username' => 'admin',
                 'password' => bcrypt('password'),
             ]
@@ -18,6 +17,6 @@ return new class {
 
     public function down(): void
     {
-        User::truncate();
+        User::delete(['email' => 'admin@mail.com']);
     }
 };

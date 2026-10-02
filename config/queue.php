@@ -1,10 +1,21 @@
 <?php
 
 return [
-    'driver' => env('QUEUE_DRIVER', 'sqlite'),
+    'driver' => env('QUEUE_DRIVER', 'database'),
     'connections' => [
-        'sqlite' => [
-            'path' => dirname(__DIR__) . '/storage/queue/jobs.db',
+        'database' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+        ],
+        'file' => [
+            'driver' => 'file',
+            'path' => dirname(__DIR__) . '/storage/app/queue.d',
+            'file_mode' => 0664,
+            'dir_mode' => 0775,
+            'fsync' => false,          // true = survive power loss, slower
+            'guard_timeout' => 5.0,    // max seconds to wait for a shard guard
+            'gc_interval' => 300,      // throttle for has()/retrieve($eraseExpired) sweeps
         ],
         'redis' => [
             'host' => env('REDIS_HOST', '127.0.0.1'),
