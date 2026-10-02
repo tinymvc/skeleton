@@ -6,12 +6,12 @@ return [
     'disks' => [
         'local' => [
             'driver' => 'local',
-            'root' => dirname(__DIR__) . '/storage/app',
+            'root' => dirname(__DIR__) . '/storage/app/private',
             'visibility' => 'private',
         ],
         'public' => [
             'driver' => 'local',
-            'root' => dirname(__DIR__) . '/storage/uploads',
+            'root' => dirname(__DIR__) . '/storage/app/public',
             'url' => rtrim(env('APP_URL', 'http://localhost:8080'), '/') . '/uploads',
             'visibility' => 'public',
         ],

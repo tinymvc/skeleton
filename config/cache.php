@@ -12,8 +12,8 @@ return [
         ],
         'file' => [
             'driver' => 'file',
-            'path' => dirname(__DIR__) . '/storage/temp/cache',
-            'lock_path' => dirname(__DIR__) . '/storage/temp/locks',
+            'path' => dirname(__DIR__) . '/storage/framework/temp/cache',
+            'lock_path' => dirname(__DIR__) . '/storage/framework/temp/locks',
             'file_mode' => 0664,
             'dir_mode' => 0775,
             'fsync' => false,          // true = survive power loss, slower

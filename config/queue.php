@@ -10,7 +10,7 @@ return [
         ],
         'file' => [
             'driver' => 'file',
-            'path' => dirname(__DIR__) . '/storage/app/queue.d',
+            'path' => dirname(__DIR__) . '/storage/framework/queue.d',
             'file_mode' => 0664,
             'dir_mode' => 0775,
             'fsync' => false,          // true = survive power loss, slower

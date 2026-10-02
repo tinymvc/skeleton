@@ -11,8 +11,8 @@ return [
 
     // Directory paths
     'storage_dir' => dirname(__DIR__) . '/storage', // Storage directory
-    'temp_dir' => dirname(__DIR__) . '/storage/temp', // Temporary files directory
-    'upload_dir' => dirname(__DIR__) . '/storage/uploads', // Upload directory
+    'temp_dir' => dirname(__DIR__) . '/storage/framework/temp', // Temporary files directory
+    'upload_dir' => dirname(__DIR__) . '/storage/app/public', // Public upload directory
     'views_dir' => dirname(__DIR__) . '/resources/views', // Template directory
     'locale_dir' => dirname(__DIR__) . '/resources/languages', // Language files directory
 
