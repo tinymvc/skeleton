@@ -1,16 +1,16 @@
 <?php
 
 return [
-    'driver' => env('QUEUE_DRIVER', 'database'),
+    'handler' => env('SESSION_HANDLER', 'database'),
     'connections' => [
         'database' => [
             'driver' => 'database',
-            'connection' => env('DB_QUEUE_CONNECTION'),
-            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'connection' => env('DB_SESSION_CONNECTION'),
+            'table' => env('DB_SESSION_TABLE', 'sessions'),
         ],
         'file' => [
             'driver' => 'file',
-            'path' => dirname(__DIR__) . '/storage/framework/queue.d',
+            'path' => dirname(__DIR__) . '/storage/framework/sessions',
         ],
         'redis' => [
             'host' => env('REDIS_HOST', '127.0.0.1'),
