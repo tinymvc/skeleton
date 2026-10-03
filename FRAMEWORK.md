@@ -183,6 +183,7 @@ app/
     Controllers/
     Middlewares/
     Requests/
+    Resources/
   Models/
   Providers/
   Jobs/
@@ -194,27 +195,33 @@ bootstrap/
   helpers.php
 config/
   app.php
+  auth.php
   cache.php
+  cors.php
   database.php
   mail.php
   queue.php
+  session.php
+  storage.php
 database/
   migrations/
 public/
   index.php
 resources/
   views/
+  languages/
 routes/
   web.php
   api.php
   webhook.php
   console.php
 storage/
-  cache/
+  app/public
+  app/private
+  framework/
   logs/
-  queue/
   temp/
-  uploads/
+tests/
 ```
 
 Always verify the actual project before creating files.
@@ -230,11 +237,7 @@ Example shape:
 
 use Spark\Foundation\Application;
 
-return Application::create(
-    path: dirname(__DIR__),
-    config: 'config',
-    providers: require __DIR__ . '/providers.php',
-)
+return Application::create(path: dirname(__DIR__))
     ->withMiddleware(
         load: __DIR__ . '/middlewares.php',
         queue: ['csrf']
@@ -297,9 +300,11 @@ return [
     'driver' => env('DB_CONNECTION', 'sqlite'),
     'connections' => [
         'sqlite' => [
+            'driver' => 'sqlite',
             'file' => dirname(__DIR__) . '/database/sqlite.db',
         ],
         'default' => [
+            // 'driver' => 'mysql', auto from env('DB_CONNECTION')
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '3306'),
             'name' => env('DB_DATABASE', 'spark'),
