@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'driver' => env('CACHE_DRIVER', 'database'),
+    'driver' => env('CACHE_STORE', 'database'),
     'connections' => [
         'database' => [
             'driver' => 'database',

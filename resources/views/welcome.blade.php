@@ -43,8 +43,8 @@
 
         .branding small {
             position: absolute;
-            bottom: -3px;
-            right: 1px;
+            bottom: -2px;
+            right: -2px;
             letter-spacing: 1px;
             text-transform: uppercase;
             text-align: right;
