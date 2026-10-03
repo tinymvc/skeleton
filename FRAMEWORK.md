@@ -297,14 +297,17 @@ Expected shape:
 <?php
 
 return [
-    'driver' => env('DB_CONNECTION', 'sqlite'),
+    // Default database connection name
+    'default' => env('DB_CONNECTION', 'sqlite'),
+
+    // Database connections for different drivers
     'connections' => [
         'sqlite' => [
             'driver' => 'sqlite',
             'file' => dirname(__DIR__) . '/database/sqlite.db',
         ],
         'default' => [
-            // 'driver' => 'mysql', auto from env('DB_CONNECTION')
+            // 'driver' => 'mysql', // auto detected from env('DB_CONNECTION')
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '3306'),
             'name' => env('DB_DATABASE', 'spark'),
@@ -315,9 +318,28 @@ return [
 ];
 ```
 
+`database.default` is a **connection name**, not a driver. Resolution:
+
+- If `connections[<default>]` exists, that entry is used. Its `driver` key wins; when omitted, the connection name is used as the driver if it is a PDO driver name (`mysql`, `pgsql`, `sqlite`, ...), otherwise `mysql`.
+- If no entry has that name but the name is a PDO driver (for example `DB_CONNECTION=mysql` or `pgsql`), `connections.default` is used with that driver. This is how the skeleton's driver-less `default` entry works.
+- Any other undefined name throws `InvalidDatabaseConfigException` ("Undefined database connection").
+- `DB::connection('name')` reads `database.connections.name` directly. A driver-less entry uses its own name when that is a PDO driver, otherwise the driver of `database.default`.
+
+Older 4.0 config files that still use the top-level `driver` key (or `default_connection`) keep working as a fallback; rename it to `default`.
+
 ### Cache, lock, queue, and session config
 
 Spark 4.0 uses `database`, `file`, or `redis` for cache/locks and queue storage. The default is `database`; `sqlite` remains a database connection type, not a storage-driver name. Session storage has its own `config/session.php`, defaulting to `database`. Unknown drivers raise an exception.
+
+The default store/connection is selected by name:
+
+| Config | Key | Env | Skeleton default |
+| --- | --- | --- | --- |
+| `config/database.php` | `default` | `DB_CONNECTION` | `sqlite` |
+| `config/cache.php` (cache and locks) | `default` | `CACHE_STORE` | `database` |
+| `config/queue.php` | `default` | `QUEUE_CONNECTION` | `database` |
+
+`cache.default` and `queue.default` name an entry in their `connections` array. That entry's `driver` (`database`, `file`, or `redis`) selects the backend; when `driver` is omitted, the entry name is used. A built-in name without an entry uses that driver's defaults; any other undefined name throws `InvalidArgumentException`. Older 4.0 configs with a top-level `driver` key are still read as a fallback; rename it to `default`.
 
 Database tables are created by migrations, not by storage constructors. Run the framework migration before using the database drivers. Connections default to the application database; use `cache.connections.database.connection`, `lock_connection`, `queue.connections.database.connection`, and `session.connections.database.connection` for named connections. Configurable table names default to `caches`, `locks`, `jobs`, `failed_jobs`, and `sessions`.
 
@@ -1364,19 +1386,25 @@ Spark 4.0 supports `database`, `file`, and `redis` in `config/cache.php`. The de
 
 ```php
 return [
-    'driver' => env('CACHE_DRIVER', 'database'),
+    // The default cache store name
+    'default' => env('CACHE_STORE', 'database'),
+
+    // The cache stores setup for your application.
     'connections' => [
         'database' => [
+            'driver' => 'database',
+            'table' => env('DB_CACHE_TABLE', 'caches'),
             'connection' => env('DB_CACHE_CONNECTION'),
-            'table' => 'caches',
             'lock_connection' => env('DB_LOCK_CONNECTION'),
-            'lock_table' => 'locks',
+            'lock_table' => env('DB_LOCK_TABLE', 'locks'),
         ],
         'file' => [
+            'driver' => 'file',
             'path' => dirname(__DIR__) . '/storage/framework/temp/cache',
             'lock_path' => dirname(__DIR__) . '/storage/framework/temp/locks',
         ],
         'redis' => [
+            'driver' => 'redis',
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'port' => env('REDIS_PORT', 6379),
             'password' => env('REDIS_PASSWORD'),
@@ -1386,6 +1414,8 @@ return [
     ],
 ];
 ```
+
+`default` names the default entry in `connections`; that entry's `driver` selects the backend (defaulting to the entry name). Locks use the same store. You may add extra named stores (for example a second Redis store with its own `prefix`) and select one with `CACHE_STORE`.
 
 Run the framework migration before using database cache/locks. `caches` contains `key`, `group`, `data`, and `expiration`; `locks` contains `key`, `owner`, and `expiration`. Neither needs `created_at`. Use case-sensitive collations for keys and owners, as in the skeleton migration. Cache values are base64-encoded PHP serialization; keep storage private and trusted. Database key storage includes a namespace hash and two separators, leaving 189 bytes for the application key with the default 255-byte limit.
 
@@ -1482,7 +1512,7 @@ if ($lock->lock('report:daily', 30, 5)) {
 }
 ```
 
-Lock driver follows cache config.
+Locks use the default cache store (`config('cache.default')`) and its entry in `cache.connections`.
 
 ## Queue and Jobs
 
@@ -1622,7 +1652,34 @@ Supported repeat aliases:
 - `quarterly` -> `Job::REPEAT_QUARTERLY`
 - `yearly` -> `Job::REPEAT_YEARLY`
 
-Queue driver is configured by `config('queue.driver')`.
+The queue connection is selected by `config('queue.default')` (`QUEUE_CONNECTION`), which names an entry in `queue.connections`; that entry's `driver` selects `database`, `file`, or `redis`.
+
+```php
+return [
+    // The default queue connection name
+    'default' => env('QUEUE_CONNECTION', 'database'),
+
+    'connections' => [
+        'database' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+        ],
+        'file' => [
+            'driver' => 'file',
+            'path' => dirname(__DIR__) . '/storage/framework/queue.d',
+        ],
+        'redis' => [
+            'driver' => 'redis',
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'port' => env('REDIS_PORT', 6379),
+            'password' => env('REDIS_PASSWORD'),
+            'database' => env('REDIS_DATABASE', 0),
+            'prefix' => env('REDIS_PREFIX', 'spark'),
+        ],
+    ],
+];
+```
 
 Important:
 
@@ -1630,7 +1687,7 @@ Important:
 - Public job properties `$tries` and `$backoff` override worker retry defaults when present.
 - Job `failed()` hooks are called by `Queue` only after all tries are exhausted, not on every retryable exception.
 - A `failed()` method may accept either `Throwable $exception` or `JobContract $job, Throwable $exception`.
-- Queue connection/driver comes from `config('queue')`; do not invent Laravel-style `onConnection()` usage.
+- The queue connection comes from `config('queue.default')`; do not invent Laravel-style `onConnection()` usage.
 - Queue has separate config from cache.
 - Database, file, and Redis drivers should behave consistently for push/pushOnce/work. Database jobs have no created_at column. Treat job metadata fields as driver-dependent unless explicitly guaranteed.
 

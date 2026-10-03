@@ -1,8 +1,10 @@
 <?php
 
 return [
+    // Default Filesystem Disk
     'default' => env('FILESYSTEM_DISK', env('FILESYSTEM_DRIVER', 'local')),
 
+    // Configuration for each filesystem disk
     'disks' => [
         'local' => [
             'driver' => 'local',

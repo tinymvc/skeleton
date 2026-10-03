@@ -1,7 +1,10 @@
 <?php
 
 return [
-    'driver' => env('CACHE_STORE', 'database'),
+    // The default cache store name
+    'default' => env('CACHE_STORE', 'database'),
+
+    // The cache stores setup for your application. You can configure multiple stores for different cache backends.
     'connections' => [
         'database' => [
             'driver' => 'database',

@@ -17,8 +17,8 @@ return [
         'upload_dir' => "$storage/uploads",
     ],
     'database' => [
-        'driver' => 'sqlite',
-        'connections' => ['sqlite' => ['file' => ':memory:']],
+        'default' => 'sqlite',
+        'connections' => ['sqlite' => ['driver' => 'sqlite', 'file' => ':memory:']],
     ],
     'storage' => [
         'default' => 'local',
@@ -28,15 +28,15 @@ return [
         ],
     ],
     'cache' => [
-        'driver' => 'file',
+        'default' => 'file',
         'connections' => ['file' => ['path' => "$storage/cache", 'lock_path' => "$storage/locks"]],
     ],
     'queue' => [
-        'driver' => 'file',
+        'default' => 'file',
         'connections' => ['file' => ['path' => "$storage/queue"]],
     ],
     'session' => [
-        'handler' => 'file',
+        'default' => 'file',
         'connections' => ['file' => ['path' => "$storage/sessions"]],
     ],
 ];

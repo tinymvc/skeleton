@@ -1,8 +1,13 @@
 <?php
 
 return [
+    // Default authentication guard to use when none is specified
     'guard' => env('DEFAULT_AUTH_GUARD', 'default'),
+
+    // User model class to use for authentication
     'model' => \App\Models\User::class,
+
+    // Authentication guards configuration
     'guards' => [
         'api' => [
             'jwt_expire' => '3 months',

@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'handler' => env('SESSION_DRIVER', 'database'),
+    'default' => env('SESSION_DRIVER', 'database'),
 
     // Minutes of inactivity before a session expires (used for gc, cookie
     // lifetime, redis TTL, and db/file expiry checks).

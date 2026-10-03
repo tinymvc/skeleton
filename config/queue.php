@@ -1,7 +1,10 @@
 <?php
 
 return [
-    'driver' => env('QUEUE_CONNECTION', 'database'),
+    // The default queue connection name
+    'default' => env('QUEUE_CONNECTION', 'database'),
+
+    // The queue connections setup for your application. You can configure multiple connections for different queue backends.
     'connections' => [
         'database' => [
             'driver' => 'database',
