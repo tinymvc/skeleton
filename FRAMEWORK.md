@@ -1104,6 +1104,8 @@ $usersWithPosts = query('users')->whereExists(function ($sub) {
 
 ## Migrations and Schema
 
+With `app.debug` disabled, migration, rollback, and fresh commands warn and ask for confirmation before changing the database (default: no). Fresh confirms once for the complete rollback/reapply operation. Pass `--force` for unattended runs.
+
 Migration files return an anonymous class with `up()` and `down()`.
 
 ```php
@@ -1821,6 +1823,8 @@ app()->on('order.created', function ($order) {
 The event dispatcher supports priorities, one-time listeners, dispatch with responses, `until`, and subscriptions.
 
 ## Console Commands
+
+Built-in commands use consistent `INFO`, `DONE`, `WARN`, and `ERROR` notices. Migrations and rollbacks print `RUNNING` followed by timed `DONE` / `FAIL` lines. Route and queue listings use tables. ANSI colors are disabled when output is redirected, `NO_COLOR` is nonempty, or `TERM=dumb`; progress uses complete lines for readable logs. Custom commands can use `Spark\Console\Prompt::info()`, `success()`, `warning()`, `error()`, `line()`, `table()`, and `status($message, $status, $duration)`. `status()` accepts an optional elapsed duration in seconds and only renders output; use `line()` when intentional multiline text is needed.
 
 Command routes may be loaded through `withRouting(commands: __DIR__ . '/../routes/console.php')` from `bootstrap/app.php`.
 
