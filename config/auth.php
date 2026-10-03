@@ -2,11 +2,12 @@
 
 return [
     'guard' => env('DEFAULT_AUTH_GUARD', 'default'),
+    'model' => \App\Models\User::class,
     'guards' => [
         'api' => [
             'jwt_expire' => '3 months',
             'jwt_token_table' => 'jwt_access_tokens', // Table name for storing JWT tokens if needed
-            'channels' => ['session'],
+            'channels' => ['jwt'],
         ],
         'session' => [
             'session_key' => 'user_id',

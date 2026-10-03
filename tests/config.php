@@ -20,12 +20,23 @@ return [
         'driver' => 'sqlite',
         'connections' => ['sqlite' => ['file' => ':memory:']],
     ],
+    'storage' => [
+        'default' => 'local',
+        'disks' => [
+            'local' => ['root' => "$storage/app/private"],
+            'public' => ['root' => "$storage/app/public"],
+        ],
+    ],
     'cache' => [
-        'driver' => 'sqlite',
-        'connections' => ['sqlite' => ['path' => "$storage/cache"]],
+        'driver' => 'file',
+        'connections' => ['file' => ['path' => "$storage/cache", 'lock_path' => "$storage/locks"]],
     ],
     'queue' => [
-        'driver' => 'sqlite',
-        'connections' => ['sqlite' => ['path' => "$storage/queue/jobs.db"]],
+        'driver' => 'file',
+        'connections' => ['file' => ['path' => "$storage/queue"]],
+    ],
+    'session' => [
+        'handler' => 'file',
+        'connections' => ['file' => ['path' => "$storage/sessions"]],
     ],
 ];

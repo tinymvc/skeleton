@@ -27,8 +27,8 @@
         "ext-curl": "Required for the HTTP client.",
         "ext-fileinfo": "Required for upload and file MIME detection.",
         "ext-gd": "Required for image manipulation.",
-        "ext-pdo_sqlite": "Required for the default sqlite cache, lock, and queue drivers.",
-        "ext-redis": "Required for redis cache, lock, and queue drivers."
+        "ext-pdo_sqlite": "Required when the database connection uses SQLite.",
+        "ext-redis": "Required for Redis cache, lock, session, and queue drivers."
     },
     "scripts": {
         "post-root-package-install": [

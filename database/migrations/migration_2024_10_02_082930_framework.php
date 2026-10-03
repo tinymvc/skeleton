@@ -55,5 +55,6 @@ return new class {
         Schema::dropIfExists('jobs');
         Schema::dropIfExists('locks');
         Schema::dropIfExists('caches');
+        Schema::dropIfExists('sessions');
     }
 };

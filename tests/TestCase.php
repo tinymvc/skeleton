@@ -7,6 +7,11 @@ use Spark\Foundation\Application;
 /** Base test case for all tests. */
 abstract class TestCase extends \Spark\Testing\ApplicationTestCase
 {
+    protected function testStorageDirectory(): string
+    {
+        return dirname(__DIR__) . '/storage/framework/testing';
+    }
+
     protected function createApplication(): Application
     {
         /** @var Application $app */
