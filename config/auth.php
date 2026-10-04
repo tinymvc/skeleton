@@ -11,7 +11,7 @@ return [
     'guards' => [
         'api' => [
             'jwt_expire' => '3 months',
-            'jwt_token_table' => 'jwt_access_tokens', // Table name for storing JWT tokens if needed
+            'jwt_token_table' => 'personal_access_tokens', // Table name for storing JWT tokens if needed
             'channels' => ['jwt'],
         ],
         'session' => [
@@ -35,7 +35,7 @@ return [
             'cookie_name' => 'auth',
             'cookie_expire' => '6 months',
             'jwt_expire' => '3 months',
-            'jwt_token_table' => 'jwt_access_tokens', // Table name for storing JWT tokens if needed
+            'jwt_token_table' => 'personal_access_tokens', // Table name for storing JWT tokens if needed
             'channels' => ['session', 'jwt', 'basic'],
             'use_remember_token' => true, // Validate remember tokens from cookies
         ],

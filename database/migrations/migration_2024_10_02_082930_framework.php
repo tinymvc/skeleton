@@ -17,7 +17,6 @@ return new class {
             $table->string('group')->nullable()->index();
             $table->longText('data');
             $table->bigInteger('expiration')->default(0)->index();
-            $table->unique(['key', 'group']);
         });
 
         Schema::create('locks', function (Blueprint $table) {
