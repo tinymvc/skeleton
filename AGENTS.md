@@ -1,8 +1,8 @@
 # TinyMVC application development
 
-For TinyMVC/Spark implementation, debugging, review, or test work, use the local [tinymvc-development skill](.agents/skills/tinymvc-development/SKILL.md). It routes to relevant sections of [FRAMEWORK.md](FRAMEWORK.md); a small task does not require reading the full reference.
+For TinyMVC/Spark implementation, debugging, review, or test work, use the local [tinymvc-development skill](.agents/skills/tinymvc-development/SKILL.md). It selects focused references within the skill; read only the topics needed for the task.
 
-Write clean, spacious Laravel-style PHP using Spark-native features first. Follow the skill’s required coding style: four-space indentation, one statement per line, deliberate blank lines, and readable multiline chains and arrays. Laravel-style formatting does not imply Laravel API compatibility.
+Write clean, spacious Laravel-style PHP using Spark-native features first. Follow the skill’s required coding style: four-space indentation, one statement per line, deliberate blank lines, and readable multiline chains and arrays. Laravel-style formatting does not imply Laravel API compatibility. For feature design, the skill links to portable application examples: direct controllers, focused domain services, model scopes, and explicit resources. Follow the target application’s nearby conventions when choosing among these patterns.
 
 Verify framework behavior against the installed `vendor/tinymvc/tinycore` package and the app's existing conventions. A sibling TinyCore checkout may contain unreleased or newer APIs. Edit that checkout only for an explicitly requested core change, rather than patching application vendor files.
 
