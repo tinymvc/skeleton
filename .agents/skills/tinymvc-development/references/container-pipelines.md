@@ -23,9 +23,9 @@ Contextual binding uses three arguments:
 
 ```php
 app()->when(
-    App\Services\ExportService::class,
-    App\Contracts\Catalog::class,
-    App\Services\ArchiveCatalog::class,
+    concrete: App\Services\ExportService::class,
+    needs: App\Contracts\Catalog::class,
+    give: App\Services\ArchiveCatalog::class,
 );
 ```
 

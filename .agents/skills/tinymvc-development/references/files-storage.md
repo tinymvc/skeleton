@@ -43,8 +43,6 @@ Utilities:
 - `Spark\Utils\File` for static local filesystem operations, or `fm()` returning a `File` instance
 - `image()`
 
-`Spark\Utils\File` replaces `Spark\Utils\FileManager`; update imports, type hints, and service bindings. The `filemanager()` helper was removed; use `fm()` instead. No old-name compatibility aliases are provided. File methods and storage configuration remain unchanged.
-
 Inspect existing app usage before implementing uploads.
 
 ### S3 direct uploads and downloads

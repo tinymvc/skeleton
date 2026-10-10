@@ -79,7 +79,7 @@ $products = cache('catalog')->remember(
 | Method | Purpose |
 | --- | --- |
 | `erase($keyOrKeys)` | Remove selected entries |
-| `flush()`, `clear()` | Empty this cache namespace |
+| `flush()` | Empty this cache namespace |
 | `flushIf($condition)` | Conditional clearing |
 | `eraseExpired()` | Remove expired entries |
 | `storeMany($items, $expire)` | Store several entries |

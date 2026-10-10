@@ -25,7 +25,7 @@ public function update(Request $request, Post $post): Response
 
     $post->fill(['title' => $input->get('title')]);
 
-    if (! $post->save()) {
+    if (!$post->save()) {
         abort(500, 'Unable to save the post.');
     }
 
