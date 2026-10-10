@@ -44,6 +44,26 @@ Common methods:
 
 Prefer builder methods over string SQL. Bind values; allowlist dynamic column names, sort directions, and SQL expressions. `select()` accepts an array/string or multiple columns. Repeated `orderBy()` calls replace ordering; use a trusted `orderByRaw()` for multiple sort columns.
 
+### Single-row results and missing records
+
+- Model `find($id)` returns `Model|null`; model `first()` normally hydrates a model. Plain table `first()` returns an object, or an array with `fetchAssoc()`. Missing rows return null in every mode.
+- `firstOrFail()` and model `findOrFail()` throw `Spark\Exceptions\NotFoundException` for a missing row. Use these when absence should become a 404; constrain tenant/owner access before retrieval.
+- `last($fields)` also returns null when empty. It orders by `id` descending, including for models with a different primary key. Its argument selects fields; use `orderDesc($column)->first()` to choose a sort column.
+- `column($name)->first()` / `fetchColumn()->first()` can return a scalar. `value($name)` returns a column value or null for either a missing row or a SQL NULL value. Retrieve a row instead when those two cases must be distinguished.
+- Preserve legitimate `0`, `false`, and empty strings. Use strict null checks instead of a broad falsey check for scalar results. A nullable scalar projection cannot itself establish whether a row exists.
+
+```php
+$post = Post::where('user_id', $userId)->whereKey($id)->first();
+
+if ($post === null) {
+    abort(404, 'Post not found');
+}
+
+return PostResource::make($post);
+```
+
+Here `Post` and `PostResource` are application classes. When upgrading, replace lookup-specific `=== false` / `!== false` checks and false return annotations with null; inspect dereferences and wrapper return types too. Keep boolean persistence/validation and raw PDO failure contracts unchanged. Test missing records, archived records, empty relations, unknown users/tokens, and required-record exceptions.
+
 ### Upserts and return values
 
 ```php

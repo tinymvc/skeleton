@@ -112,7 +112,7 @@ Custom casts implement `get($value)` and `set($value)` with no model/key/context
 
 Model behavior to preserve:
 
-- `find()` / `first()` return a model or false; the `OrFail` variants throw. `all()` returns an array, `get()` a Collection, and `save()` / `remove()` booleans.
+- `find()` / `first()` return a model or null; the `OrFail` variants throw. `all()` returns an array, `get()` a Collection, and `save()` / `remove()` booleans.
 - Disable timestamps with `protected const USE_TIMESTAMPS = false`; otherwise create both timestamp columns. `CREATED_AT` / `UPDATED_AT` rename them.
 - `getChanges()` contains original values of changed fields; read current attributes for new values. Dirty tracking needs a persisted baseline.
 - `copy()` clones the primary key too; it is not row replication. `only()` / `except()` return projected model objects, not plain arrays.

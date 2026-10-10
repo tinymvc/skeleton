@@ -5,7 +5,7 @@ description: Implement, debug, review, and test TinyMVC applications powered by 
 
 # TinyMVC Development
 
-Develop against the project's installed TinyCore APIs and existing application conventions. The complete framework reference lives in this skill’s `references/` directory. Select the relevant topics below; do not load every reference for a small change. All source paths and commands are relative to the application root unless explicitly marked as core commands.
+Develop against the project's installed TinyCore APIs and existing application conventions. The task-focused framework references live in this skill’s `references/` directory. Select the relevant topics below; do not load every reference for a small change. All source paths and commands are relative to the application root unless explicitly marked as core commands.
 
 ## Establish the implementation context
 
@@ -27,6 +27,8 @@ Use Laravel-style PHP formatting with Spark's actual APIs. These are required co
 - Prefer guard clauses, focused methods, and direct expressions. Use arrow functions for a single expression and full closures for multiple steps. Avoid nested ternaries, clever side effects in conditions, redundant wrappers, and comments that merely repeat the code.
 - Use Spark's native validation, resources, relations, scopes, `Arr`, `Str`, collections, helpers, and services before writing a replacement. Inspect the installed implementation first. A native feature is preferred when it fits the requirement; a simple PHP expression is better than an unnecessary abstraction.
 - Add services or reusable abstractions only when they clarify a real responsibility or remove meaningful repetition. Keep controllers readable without scattering a short operation across many classes.
+
+For missing records, `find()` / `first()` return null; check `=== null` before access or use `findOrFail()` / `firstOrFail()` for required records. See [lookup contracts](references/queries.md#single-row-results-and-missing-records) for fetch modes and upgrade pitfalls.
 
 For model actions, inspect return values before chaining. `create()` and `fill()` return a model; `save()` / `remove()` return booleans; query `update()` / `delete()` return affected-row counts. Use global `tap($model, $callback)` to retain the model and `pipe($value, $callback)` to return a transformation result, when available in the installed version. Models do not provide native instance `tap()` or `pipe()` methods. Do not add these calls based on Laravel familiarity. `tap()` ignores callback return values, so explicitly handle a failed `save()` when success is required. Ordinary local variables are equally appropriate when clearer.
 
@@ -78,6 +80,9 @@ Read the primary reference for the task, then follow related references only whe
 | Files, uploads or cloud storage | [Files and storage](references/files-storage.md): local/private/public paths, uploads and S3 |
 | External mail or HTTP | [Mail and HTTP](references/mail-http.md): client APIs and external-service boundaries |
 | Helpers and utilities | [Helpers](references/helpers.md): paths, config, facades and native utilities |
+| Service composition, injection or staged imports | [Container and pipelines](references/container-pipelines.md): bindings, shared lifetimes, event payloads and transformation failures |
+| Parallel work or subprocesses | [Concurrency](references/concurrency.md): execution choices, fallback runtime, task errors and repeated execution |
+| Languages or time-sensitive features | [Localization and dates](references/localization-dates.md): translation files, escaping, request locale and timezone boundaries |
 | Extend or debug framework services | [Extensions and errors](references/extensions-errors.md): providers, events, commands and exceptions |
 | Tests or diagnosis | [Workflow and testing](references/workflow-testing.md): feature recipe, native runner, isolation and verification |
 | Release or upgrade work | [Upgrades](references/upgrades.md): version migration; [operations](references/operations.md): deploy, diagnose and verify |
