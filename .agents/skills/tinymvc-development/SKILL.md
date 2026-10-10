@@ -75,6 +75,7 @@ Read the primary reference for the task, then follow related references only whe
 | Browser state | [Sessions](references/sessions.md): handlers, cookies, flash, regeneration and concurrent requests |
 | Cache or shared locks | [Cache and locks](references/cache-locks.md): storage, expiry, misses, ownership and contention |
 | Background jobs | [Queues](references/queues.md): dispatch, workers, retries, reservations and recurring work |
+| Set up frontend assets or navigation | [Frontend setup](references/frontend-setup.md): Blade/Vite baseline, FireLine v2 adapter, Inertia bootstrap and response contracts |
 | Templates or frontend | [Views and frontend](references/views-frontend.md): Blade, components, assets and optional integrations |
 | API output or redirects | [Responses](references/responses.md): status, redirect lifecycle and JSON resources |
 | Files, uploads or cloud storage | [Files and storage](references/files-storage.md): local/private/public paths, uploads and S3 |

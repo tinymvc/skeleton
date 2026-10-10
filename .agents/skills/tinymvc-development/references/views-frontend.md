@@ -209,6 +209,8 @@ Component prop values and HTML attributes have different jobs. Extract declared 
 
 ## Frontend Integrations
 
+For setup, version selection, Vite entries, provider/middleware registration, and response contracts, read [Frontend setup](frontend-setup.md).
+
 Inspect `package.json`, `vite.config.js`, existing templates/pages, and registered providers before choosing an approach. The skeleton uses Vite, Tailwind, Alpine, and Blade; optional packages may add different capabilities.
 
 | Existing stack | Development approach |
