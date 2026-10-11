@@ -1,18 +1,14 @@
-# Requests Validation
+# Requests and Validation
 
-Contents:
+Read this reference for HTTP requests, form validation, and FormRequest classes. All source paths and command working directories refer to the application root.
 
-- [Requests and Validation](#requests-and-validation)
+## FormRequest: The Primary Validation Standard
 
-Read this reference for requests and validation. Source paths and command working directories refer to the application root unless explicitly stated otherwise. Check the installed package when versions differ.
+Always use dedicated **`Spark\Foundation\Http\FormRequest`** classes for resource creation, update, and complex actions. Form requests encapsulate authorization and validation outside of the controller, keeping actions clean and thin.
 
-## Requests and Validation
+### Defining a Form Request
 
-Base request: `Spark\Http\Request`
-
-Form request: `Spark\Foundation\Http\FormRequest`
-
-Form requests validate immediately in the constructor:
+Create form requests in `app/Http/Requests`:
 
 ```php
 <?php
@@ -20,102 +16,159 @@ Form requests validate immediately in the constructor:
 namespace App\Http\Requests;
 
 use Spark\Foundation\Http\FormRequest;
+use Spark\Http\Auth;
 
 class StorePostRequest extends FormRequest
 {
+    /**
+     * Determine if the user is authorized to make this request.
+     * Returning false automatically aborts with a 403 Forbidden.
+     */
     public function authorize(): bool
     {
-        return auth()->check();
+        return Auth::check();
     }
 
+    /**
+     * Get the validation rules that apply to the request.
+     */
     public function rules(): array
     {
         return [
             'title' => 'required|string|max:255',
-            'body' => 'required|string',
+            'slug' => ['required', 'string', 'alpha_dash', 'max:255', ['unique' => ['posts', 'slug']]],
+            'content' => 'required|string',
+            'category_id' => ['required', 'integer', ['exists' => ['categories', 'id']]],
+            'tags' => 'nullable|array',
+            'tags.*' => 'integer',
             'published' => 'nullable|boolean',
         ];
     }
 
+    /**
+     * Custom error messages (optional).
+     */
     public function messages(): array
     {
         return [
-            'title.required' => 'A title is required.',
+            'title.required' => 'A post title is required.',
+            'category_id.exists' => 'The selected category does not exist.',
+        ];
+    }
+
+    /**
+     * Custom attribute names for validator error messages (optional).
+     */
+    public function attributes(): array
+    {
+        return [
+            'category_id' => 'category',
         ];
     }
 }
 ```
 
-Use in a controller:
+### FormRequest Lifecycle and Controller Injection
+
+Type-hint the `FormRequest` in your controller action parameter:
 
 ```php
-public function store(StorePostRequest $request)
+use App\Http\Requests\StorePostRequest;
+use App\Http\Resources\PostResource;
+use App\Models\Post;
+use Spark\Http\Response;
+
+public function store(StorePostRequest $request): Response
 {
-    $data = $request->validated()->toArray();
+    // The request is ALREADY authorized and validated!
+    // If authorize() returned false -> 403 Forbidden was thrown before reaching here.
+    // If rules failed -> 422 Unprocessable Entity was thrown before reaching here.
+
+    $post = Post::create($request->validated());
+
+    return PostResource::make($post)->response(201);
 }
 ```
 
-Common validation rules:
+### Accessing Validated Data
 
-- `required`, `required_if`, `required_unless`
-- `present`, `filled`, `nullable`, `sometimes`
-- `email`, `url`
-- `string`, `text`, `char`
-- `numeric`, `number`, `int`, `integer`
-- `array`, `list`
-- `min`, `max`, `size`, `between`
-- `same`, `confirmed`, `gt`, `gte`, `lt`, `lte` (`ls` / `lse` aliases)
-- `in`, `not_in`
-- `regex`
-- `unique`, `exists`, `not_exists`
-- `boolean`, `float`, `decimal`
-- `alpha`, `alpha_num`, `alpha_dash`, their `:ascii` forms, and `ascii`
-- `digits`, `digits_between`, `min_digits`, `max_digits`
-- `date`, `date_format`, `before`, `after`
-- `json`, `ip`, `ipv4`, `ipv6`, `mac_address`, `uuid`
-- `lowercase`, `uppercase`
-- `starts_with`, `ends_with`, `contains`, `not_contains`
-- `accepted`, `declined`, `prohibited`
-- `file`, `image`, `mimes`
-- `password`
+- `$request->validated()` returns a `Spark\Http\Input` instance.
+- `$request->validated()->toArray()` or `$request->validated()->all()` returns a clean PHP array of only the validated fields.
+- `$request->validated('title')` retrieves a single validated field.
+- `$request->validated('is_featured', false)` retrieves with a default fallback.
 
-Request input helpers:
+---
+
+## Inline Request Validation
+
+Reserve inline `$request->validate([...])` **only** for lightweight search filters or simple single-field endpoints where a dedicated FormRequest would be excessive:
 
 ```php
-$request->query('page', 1);
-$request->post('email');
-$request->input('email');
-$request->only(['name', 'email']);
-$request->except(['password']);
-$request->safe('body', ['p', 'strong']);
-$request->input()->boolean('published'); // Input wrapper; this does not validate the field
+public function index(Request $request): Response
+{
+    $validated = $request->validate([
+        'q' => 'nullable|string|max:100',
+        'status' => ['nullable', 'string', ['in' => ['draft', 'published']]],
+    ]);
+
+    $query = Post::query();
+
+    if ($search = $validated->get('q')) {
+        $query->where('title', 'LIKE', "%{$search}%");
+    }
+
+    return PostResource::collection($query->latest()->paginate(20));
+}
 ```
 
-### Optional fields, nested rules, and validated values
+---
+
+## Common Validation Rules
+
+Spark includes a rich set of built-in validation rules:
+
+- **Presence**: `required`, `required_if:field,val`, `required_unless:field,val`, `present`, `filled`, `nullable`, `sometimes`, `prohibited`
+- **Strings**: `string`, `text`, `char`, `alpha`, `alpha_num`, `alpha_dash`, `ascii`, `starts_with`, `ends_with`, `contains`, `not_contains`, `lowercase`, `uppercase`, `regex`
+- **Numbers**: `numeric`, `integer`, `int`, `float`, `decimal`, `digits`, `digits_between:min,max`, `min_digits`, `max_digits`
+- **Comparisons**: `min:value`, `max:value`, `size:value`, `between:min,max`, `same:field`, `confirmed`, `gt:field`, `gte:field`, `lt:field`, `lte:field`
+- **Database**:
+  - `unique`: `['unique' => ['table', 'column', 'ignore_id']]`
+  - `exists`: `['exists' => ['table', 'column']]`
+  - `not_exists`: `['not_exists' => ['table', 'column']]`
+- **Arrays & Lists**: `array`, `list`, `items.*.name`
+- **Enums & Sets**: `in`: `['in' => ['draft', 'published', 'archived']]`, `not_in`
+- **Web & Format**: `email`, `url`, `ip`, `ipv4`, `ipv6`, `mac_address`, `uuid`, `json`
+- **Dates**: `date`, `date_format:format`, `before:date`, `after:date`
+- **Files**: `file`, `image`, `mimes:jpg,png,pdf`
+- **Booleans**: `boolean`, `accepted`, `declined`
+- **Security**: `password`
+
+### Parameter Arrays vs Pipe Strings
+
+Rules can be specified as pipe-delimited strings (`'required|string|max:255'`) or arrays (`['required', 'string', 'max:255']`). Rules that take complex arguments (such as `in`, `unique`, or `exists`) must use associative parameter arrays:
 
 ```php
-$data = $request->validate([
-    'username' => ['sometimes', 'string', 'alpha_dash', 'min:3', 'max:30',
-        ['unique' => ['users', 'username', auth()->id()]]],
-    'share_method' => ['nullable', 'string', ['in' => ['copy_link', 'native_share', 'message']]],
-    'settings' => 'sometimes|array',
-    'settings.allow_share' => 'sometimes|required|boolean',
-    'items' => 'required|array|max:50',
-    'items.*.name' => 'required|string|max:100',
-    'minimum' => 'required|numeric',
-    'maximum' => 'required|numeric|gt:minimum',
-]);
+$rules = [
+    'role' => ['required', ['in' => ['admin', 'editor', 'author']]],
+    'email' => ['required', 'email', ['unique' => ['users', 'email', $userId]]],
+    'category_id' => ['required', ['exists' => ['categories', 'id']]],
+];
 ```
 
-`sometimes` skips every rule for an absent key. `nullable` permits a present null and skips non-presence rules; it does not override `required`. `filled` rejects supplied empty values, `present` requires the key, and `prohibited` accepts absence or emptiness. Required accepts `0`/`false`. Optional blank strings skip non-presence checks and are not automatically converted to null. Apply presence rules to the parent array and each required child; wildcards expand existing entries. Child rules filter the returned keys of explicitly validated array parents. Errors use concrete dot paths; wildcard messages are supported. Escape literal dots in keys.
+---
 
-Parameter arrays (`['in' => [...]]`, `['unique' => [$table, $column, $authorizedId]]`) preserve lists and string parameters retain case. Unique ignores a numeric `id`, with no custom ignore-column parameter. Field comparisons measure compatible numbers, string lengths, array counts, or uploaded KB; use min/max for literal limits. ASCII validation uses `Str::isAscii()` and needs `voku/portable-ascii`; it rejects rather than transliterates. Integer validation rejects fractional values, scientific-notation strings, and booleans; numeric/float/decimal use `is_numeric()`. Unknown rules still pass, and Laravel Rule objects/bail are unsupported.
+## Request Input Helpers
 
-`validated()` returns `Input`, even for an empty successful result; `validated($key, $default)` reads a top-level key. Use `Spark\Support\Arr::get($data->toArray(), 'settings.allow_share')` for nested retrieval. Validation failure throws `Spark\Foundation\Exceptions\ValidationException`, replacing `ValidationErrorException`; the application formats JSON 422, browser redirects, or FireLine errors. Browser input flashing requires care with sensitive fields.
+For reading raw request data:
 
-Request `integer()`, `float()`, and `boolean()` conversions preserve zero/false instead of replacing them with a default. They do not replace validation. `bearerToken()` returns a token from a valid case-insensitive Bearer header, otherwise null.
-
-`acceptedTypes()` maps MIME types to quality weights, highest first; ties preserve header order. `accept($mime)` requires an explicit positive-quality entry. `accepts($mime)` also honors wildcards and specific `q=0` rejections. Invalid quality weights are zero; media parameters other than `q` are not distinguished. `wantsJson()` checks the highest-ranked acceptable `/json` or `+json` type. `acceptsAnyContentType()` checks a missing/empty Accept header or a preferred positive global wildcard. `expectsJson()` also supports AJAX wildcard requests unless JSON is explicitly rejected, and always treats `/api`, `/api/...`, `/webhook`, `/webhook/...` as JSON paths.
-
-`ip()` trusts forwarded IPs only from peers matching `app.trusted_proxies` (IPv4/IPv6 addresses or CIDRs; skeleton environment: comma-separated `TRUSTED_PROXIES`). The default `app.trusted_proxy_header` is `x-forwarded-for`: scan right to left to the first untrusted address, or use the leftmost when all hops are trusted. Invalid masks never grant trust; malformed chains fall back to the peer. `CF-Connecting-IP` requires explicit `trusted_proxy_header: 'cf-connecting-ip'` / `TRUSTED_PROXY_HEADER` and trusted peers that overwrite that header. Use `'*'` only behind a proxy that sanitizes forwarding data and blocks direct access. These settings affect client IP, not scheme or host.
-
+```php
+$request->query('page', 1);            // Query string parameter
+$request->post('email');               // POST body parameter
+$request->input('email');              // Query or body parameter
+$request->only(['name', 'email']);     // Extract subset of input
+$request->except(['password']);        // Exclude specific fields
+$request->input()->boolean('active');  // Cast input to boolean
+$request->bearerToken();               // Extract token from Bearer header
+$request->file('avatar');              // Uploaded file instance
+$request->user();                      // Current authenticated user
+```

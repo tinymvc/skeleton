@@ -1,73 +1,112 @@
-# Queries
+# Queries and Database Operations
 
-Contents:
+Read this reference for database queries, model queries, transactions, and locks. All source paths and commands are relative to the application root.
 
-- [Query Builder](#query-builder)
+## Model-First Query Architecture
 
-Read this reference for query builder. Source paths and command working directories refer to the application root unless explicitly stated otherwise. Check the installed package when versions differ.
-
-## Query Builder
-
-Use `query($table)` or model static calls.
+> [!IMPORTANT]
+> **Always Use Model Queries for Domain Entities**:
+> When interacting with database tables that have corresponding application models (`User`, `Post`, `Order`, etc.), **always query through the Model**.
+> 
+> **Never use `DB::table('users')` or `query('users')` for domain models**. Bypassing the model causes severe defects:
+> - **Lost Attribute Casting**: Booleans remain integers `0`/`1`, JSON fields remain raw strings, and datetimes are not converted to `Spark\Carbon` instances.
+> - **Lost Timestamps**: Bypasses automatic `created_at` and `updated_at` management.
+> - **Lost Soft Deletes**: Bypasses `InteractsWithSoftDeletes`, accidentally exposing or overwriting trashed rows.
+> - **Lost Relations & Scopes**: Disables `with()`, `whereHas()`, `withCount()`, and domain scopes like `scopePublished()`.
+> - **No Hydration**: Returns unhydrated stdClass objects or arrays instead of active Model entities.
 
 ```php
-$users = query('users')
-    ->where('active', true)
-    ->orderDesc('id')
-    ->take(20)
+// GOOD: Eloquent-style Model querying
+$users = User::where('active', true)->latest()->take(20)->get();
+$post = Post::findOrFail($id);
+$posts = Post::with('author')->paginate(15);
+```
+
+### When are `DB::table()` or `query()` Appropriate?
+Use raw query builders **only** for:
+- Low-level table operations without an associated Model (e.g. migration verification, raw pivot table operations).
+- Performance-critical bulk reads that deliberately bypass model hydration.
+- Direct database schema maintenance utilities.
+
+---
+
+## Model Querying
+
+```php
+// Finding records
+$post = Post::find($id);                     // Returns Post|null
+$post = Post::findOrFail($id);             // Returns Post or throws 404 NotFoundException
+$post = Post::where('slug', $slug)->first(); // First matching record or null
+$post = Post::where('slug', $slug)->firstOrFail();
+
+// Collections and Arrays
+$posts = Post::where('published', true)->get();      // Returns Spark\Support\Collection<Post>
+$postsArray = Post::where('published', true)->all(); // Returns array<Post>
+
+// Ordering and Pagination
+$posts = Post::latest()->paginate(20);               // Order by created_at DESC, returns Paginator
+$oldest = Post::oldest()->first();                   // Order by created_at ASC
+
+// Aggregates & Existence
+$count = Post::where('published', true)->count();
+$exists = Post::where('slug', $slug)->exists();
+$missing = Post::where('slug', $slug)->doesntExist();
+$totalCredits = User::sum('credits');
+```
+
+---
+
+## Native ORM Relations vs Raw Joins
+
+> [!TIP]
+> **Prefer Native Relations over Manual `join()` or `whereRaw()`**:
+> TinyCore features a comprehensive ORM relationship engine. Avoid writing manual SQL joins or raw WHERE clauses when native relations can express the query:
+
+```php
+// BAD: Manual joins and where clauses
+$posts = DB::table('posts')
+    ->join('users', 'users.id', '=', 'posts.user_id')
+    ->where('users.role', 'admin')
+    ->select('posts.*')
     ->all();
 
-$id = query('users')->insert([
-    'name' => 'Jane',
-    'email' => 'jane@example.com',
-]);
+// GOOD: Native Model relation querying
+$posts = Post::whereRelation('author', 'role', 'admin')->get();
 
-query('users')->where('id', $id)->update(['active' => false]);
-query('users')->where('id', $id)->delete();
+// GOOD: Filtering with relation closure
+$posts = Post::whereHas('comments', fn($q) => $q->where('approved', true))->get();
+
+// GOOD: Eager loading and counts
+$posts = Post::query()
+    ->with(['author', 'category'])
+    ->withCount('comments')
+    ->latest()
+    ->get();
 ```
 
-Common methods:
+---
 
-- `table`, `from`, `select`, `selectRaw`, `column`
-- `where`, `orWhere`, `whereRaw`, `grouped`
-- `whereNull`, `whereIn`, `between`, `like`
-- `whereDate`, `whereYear`, `whereMonth`
-- JSON helpers
-- joins
-- `orderBy`, `orderAsc`, `orderDesc`
-- `limit`, `offset`, `take`, `skip`
-- `first`, `firstOrFail`, `last`, `all`, `get`, `paginate`
-- `value`, `pluck`, `count`, `exists`, `doesntExist`
-- `insert`, `insertOrIgnore`, `insertOrReplace`, `upsert`, `update`, `delete`, `forceDelete`, `restore`, `truncate`
-- `updateOrInsert`, `increment`, `decrement`
-- `toSql`
+## Builder Methods Reference
 
-Prefer builder methods over string SQL. Bind values; allowlist dynamic column names, sort directions, and SQL expressions. `select()` accepts an array/string or multiple columns. Repeated `orderBy()` calls replace ordering; use a trusted `orderByRaw()` for multiple sort columns.
+Common QueryBuilder / Model methods:
 
-### Single-row results and missing records
+- **Selection**: `select('id', 'title')`, `selectRaw('COUNT(*) as total')`, `distinct()`, `column('title')`
+- **Conditions**: `where('status', 'active')`, `orWhere('role', 'admin')`, `whereNull('deleted_at')`, `whereNotNull('published_at')`
+- **Lists & Ranges**: `whereIn('id', [1, 2, 3])`, `whereNotIn('status', ['archived'])`, `between('age', 18, 65)`
+- **Strings**: `whereContains('bio', 'engineer')`, `whereStartsWith('sku', 'SPARK-')`, `whereEndsWith('email', '@example.com')`, `like('name', '%John%')`
+- **Dates**: `whereDate('created_at', '2026-10-11')`, `whereYear('created_at', 2026)`, `whereMonth('created_at', 10)`
+- **Relations**: `with()`, `withExists()`, `withCount()`, `withSum()`, `withAvg()`, `whereHas()`, `whereDoesntHave()`, `whereRelation()`
+- **Ordering**: `orderBy('id', 'DESC')`, `orderDesc('id')`, `orderAsc('name')`, `latest()`, `oldest()`, `random()`
+- **Limiting**: `take(10)`, `skip(20)`, `limit(offset: 0, limit: 10)`
+- **Terminal Execution**: `first()`, `firstOrFail()`, `get()`, `all()`, `paginate(limit: 20)`, `pluck('name', 'id')`, `value('title')`
+- **Mutations**: `insert([...])`, `update([...])`, `delete()`, `increment('views')`, `decrement('stock')`, `upsert(...)`
 
-- Model `find($id)` returns `Model|null`; model `first()` normally hydrates a model. Plain table `first()` returns an object, or an array with `fetchAssoc()`. Missing rows return null in every mode.
-- `firstOrFail()` and model `findOrFail()` throw `Spark\Exceptions\NotFoundException` for a missing row. Use these when absence should become a 404; constrain tenant/owner access before retrieval.
-- `last($fields)` also returns null when empty. It orders by `id` descending, including for models with a different primary key. Its argument selects fields; use `orderDesc($column)->first()` to choose a sort column.
-- `column($name)->first()` / `fetchColumn()->first()` can return a scalar. `value($name)` returns a column value or null for either a missing row or a SQL NULL value. Retrieve a row instead when those two cases must be distinguished.
-- Preserve legitimate `0`, `false`, and empty strings. Use strict null checks instead of a broad falsey check for scalar results. A nullable scalar projection cannot itself establish whether a row exists.
+---
+
+## Upserts and Writes
 
 ```php
-$post = Post::where('user_id', $userId)->whereKey($id)->first();
-
-if ($post === null) {
-    abort(404, 'Post not found');
-}
-
-return PostResource::make($post);
-```
-
-Here `Post` and `PostResource` are application classes. When upgrading, replace lookup-specific `=== false` / `!== false` checks and false return annotations with null; inspect dereferences and wrapper return types too. Keep boolean persistence/validation and raw PDO failure contracts unchanged. Test missing records, archived records, empty relations, unknown users/tokens, and required-record exceptions.
-
-### Upserts and return values
-
-```php
-query('products')->upsert(
+Product::upsert(
     [
         ['sku' => 'SPARK-01', 'name' => 'Starter', 'price' => 25],
         ['sku' => 'SPARK-02', 'name' => 'Team', 'price' => 50],
@@ -77,73 +116,39 @@ query('products')->upsert(
 );
 ```
 
-The signature is `upsert($data, ?array $conflict = null, ?array $update = null)`: separate arrays, not the old combined config array. Null conflict defaults to `['id']`; null/omitted/empty update selects all supplied non-conflict columns. Add a matching unique constraint. MySQL uses actual unique indexes, while SQLite/PostgreSQL use the conflict target. Insert variants return an integer ID, not an affected-row count. PostgreSQL reads it from RETURNING and returns zero for inserts without a numeric primary key; ignored inserts return zero. `update()` / `delete()` / `forceDelete()` return affected-row counts; builder `restore()` returns bool.
+- Signature: `upsert($data, ?array $conflict = null, ?array $update = null)`.
+- `conflict` specifies the unique constraint columns (defaults to `['id']`).
+- `update` specifies the columns to update on conflict (omitted/null updates all non-conflict columns).
 
-`firstOrCreate()` / `updateOrInsert()` are lookup-then-write operations; use unique constraints for concurrent inserts. `insertOrReplace()` emits replacement SQL on MySQL/SQLite and throws on PostgreSQL; use explicit upsert conflict columns there. There is no declared `bulkUpdate()` method.
+---
 
-### State, pagination, and write boundaries
+## Database Transactions and Row Locks
 
-Use a fresh builder for each operation or `copy()` before execution. `first()`, `all()` and `paginate()` reset query state after retrieval; `count()` and `exists()` preserve the builder’s predicates for subsequent reads. Writes clear conditions/bindings. A method forwarded to Collection loads results into memory, so do not assume `chunk()` is database streaming. Mapper callbacks receive the whole result array, not a single row.
-
-`paginate($limit = 10, $keyword = 'page', $fields = null)` uses the query-string page and returns `Spark\Utils\Paginator`. Bound the page size and sort consistently. `items()`, `total()`, `page()`, and `pages()` expose data/metadata. Filter before pagination; grouped `count()` counts groups, and distinct/union totals are preserved. Pagination counts the result before applying limit/offset on every driver.
-
-`update()`, `delete()`, `forceDelete()`, and builder `restore()` require a WHERE condition or an explicit trash scope on a soft-delete model. A bare default model query does not satisfy that guard. Increment/decrement can affect every row in scope; `truncate()` physically empties the whole table regardless of trash scope. Plain table queries do not apply model casts, lifecycle callbacks, or archive filtering.
-
-For nontrivial JSON/date-part SQL, inspect the driver-specific implementation. JSON helpers use field/key/value and text matching on all three drivers; use dot-separated object paths for portable cases. Date-part helpers extract DATE/YEAR/MONTH on all three drivers. Test on the production driver when depending on these differences.
-
-Paginator JSON now contains `current_page`, `data`, `first_page_url`, `from`, `last_page`, `last_page_url`, `links`, `next_page_url`, `path`, `per_page`, `prev_page_url`, `to`, and `total`. Old page/limit methods remain; JSON keys changed. `Paginator::make()` constructs it, and `currentPage()`, `perPage()`, `lastPage()`, `hasMorePages()`, `hasPages()`, `onFirstPage()`, `onLastPage()`, `url()`, `previousPageUrl()`, and `nextPageUrl()` expose navigation. `links` retains Spark link-entry shapes. `through($callback)` returns a mapped array without mutating stored data. Full-array `data(slice: true)` also does not mutate data before serialization.
-
-### Connections and transactions
+Use `Spark\Facades\DB::transaction()` to execute multi-step database writes atomically:
 
 ```php
 use Spark\Facades\DB;
+use App\Models\User;
+use App\Models\Order;
 
-$result = DB::transaction(function () use ($userId) {
-    return DB::table('posts')->where('user_id', $userId)->update(['published' => true]);
-});
-```
-
-The facade helper commits the callback result or rolls back/rethrows an exception. It uses the application connection, creates savepoints for nested calls, and has no retry loop. Never manually finish/reconnect the transaction or use implicitly committing DDL inside a callback. `Spark\Database\DB::connection($configOrName)` creates a separate wrapper; use its `table()` and transaction methods consistently. Creating another wrapper does not move models or Schema to it. Schema refreshes its cached PDO/grammar when the application DB is replaced. `connect_db()` returns a builder. `reset()` / `resetPdo()` replace connection state and must not interrupt a transaction.
-
-
-### Primary keys, aliases, and row locks
-
-`withAlias($column)` qualifies a bare column with the current read alias, or the effective `from()` / table name including `prefix()`. It trims surrounding whitespace, preserves already-qualified names (`p.created_at`, `users.id`) and SQL expressions, and qualifies quoted bare identifiers as well. `latest()` / `oldest()` use it, as do the default `id` orderings of `orderAsc()`, `orderDesc()`, and `last()`. Explicit qualifiers are kept exactly as supplied: use the actual SQL alias once a table has been aliased. This helper does not escape or validate raw SQL expressions; choose ordering expressions in application code. Primary-key and soft-delete predicates retain their separate compilation rules so reads use aliases and writes use physical tables.
-
-`Model::whereKey($id)` filters the model's primary key; an array produces an IN condition and an empty array matches no rows. `whereNotKey($id)` excludes one key with `!=`; an array uses NOT IN, and an empty array excludes nothing while preserving other conditions and model scopes. Both helpers support custom primary keys and relations. `find($id)` / `findOrFail($id)` use the same qualified condition. Read predicates use the current table alias, including an alias assigned after `whereKey()`. Relation builders target the related model's key while retaining the relation's parent/pivot conditions. Plain table queries should use an explicit `where('users.id', $id)`; they have no model key metadata.
-
-Existing model instance writes and locked reads use the original primary value, grouped outside caller OR conditions. Changing an in-memory primary key does not retarget that instance operation. Write predicates target the physical table; this does not add portable joined-update support. Qualify your own ambiguous join columns explicitly.
-
-```php
-use Spark\Facades\DB;
-
-DB::transaction(function () use ($userId) {
+$order = DB::transaction(function () use ($userId, $items): Order {
     $user = User::whereKey($userId)->lockForUpdate()->firstOrFail();
-    $user->increment('credits', 1);
+
+    if ($user->balance < $total) {
+        abort(400, 'Insufficient balance.');
+    }
+
+    $user->decrement('balance', $total);
+
+    return Order::create([
+        'user_id' => $user->id,
+        'total' => $total,
+        'status' => 'completed',
+    ]);
 });
 ```
 
-`lockForUpdate()` requests an exclusive SELECT lock. `sharedLock()` (or `lock(false)`) requests a shared lock; **false does not disable locking**. `lock(null)` removes the lock clause. MySQL uses `FOR UPDATE` / `LOCK IN SHARE MODE`; PostgreSQL uses `FOR UPDATE` / `FOR SHARE`; SQLite emits no row-lock clause. SQLite transactions do not provide equivalent row-level locking. `lock($trustedSql)` accepts a raw, driver-specific clause.
-
-Lock methods only configure a builder. Execute the SELECT inside a transaction and perform subsequent writes on the same connection before committing. `User::findOrFail($id)->lockForUpdate()->firstOrFail()` scopes the second read to the instance's original key; reading it again under the lock is essential. Prefer the single-read example above. New instances without an original primary value need an explicit condition. Locks do not make lookup-then-insert helpers race-free; retain unique constraints. Avoid lock clauses on aggregates/grouped/union queries unless supported by the target database.
-
-`Spark\Database\DB::connection($configOrName)->transaction($callback)` passes that concrete connection to the callback and returns its result. The facade transaction uses the application connection. Nested calls use savepoints, failures roll back and rethrow, and neither form retries deadlocks automatically. Queries, models, and schema operations must use the intended connection; creating a separate wrapper does not rebind model queries.
-
-### Subqueries
-
-`whereIn($column, $values)`, `whereNotIn()`, `orWhereIn()`, and `orWhereNotIn()` accept `array|string|QueryBuilder|Closure`. Arrays remain bound value lists; the other forms delegate to `whereInSub()` with the corresponding IN/NOT IN and AND/OR behavior. Strings are trusted subquery SQL, not comma-separated values: use `['published']` for a single literal. Empty IN arrays match nothing; empty NOT IN arrays exclude nothing.
-
-`selectSub($subquery, $alias)`, `whereInSub($column, $subquery)`, and `whereNotInSub($column, $subquery)` accept a builder, a closure, or trusted SQL. Builder bindings are imported with distinct parameter names. Closure arguments receive a builder on the same connection; set its table explicitly for a different table.
-
-```php
-$authors = query('posts')->select('user_id')->where('published', true);
-$users = query('users')->whereIn('id', $authors)->all();
-
-$usersWithPosts = query('users')->whereExists(function ($sub) {
-    $sub->table('posts')->selectRaw('1')
-        ->whereColumn('posts.user_id', 'users.id');
-})->all();
-```
-
-`whereExists($subquery, $boolean = 'AND', $not = false)` and `whereNotExists($subquery, $boolean = 'AND')` accept the subquery directly, without a column argument. EXISTS applies to the subquery as a whole; correlate it explicitly with `whereColumn()` as above. Remove the former leading column argument when upgrading. OR variants (`orWhereInSub`, `orWhereNotInSub`, `orWhereExists`, `orWhereNotExists`) are available. Prefer `whereHas()` for model relationships and their built-in scopes.
-
+- If an exception is thrown inside the callback, the transaction is automatically rolled back and the exception rethrown.
+- `lockForUpdate()` requests an exclusive SELECT lock (`FOR UPDATE`).
+- `sharedLock()` requests a shared read lock (`LOCK IN SHARE MODE` / `FOR SHARE`).
+- Locks must always be run within an active transaction to prevent race conditions.

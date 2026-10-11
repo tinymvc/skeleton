@@ -1,101 +1,95 @@
-# Routing Controllers
+# Routing and Controllers
 
-Contents:
-
-- [Routing](#routing)
-- [Controllers](#controllers)
-
-Read this reference for routing, controllers. Source paths and command working directories refer to the application root unless explicitly stated otherwise. Check the installed package when versions differ.
+Read this reference for routing, route model binding, and controller patterns. All source paths and command working directories refer to the application root.
 
 ## Routing
 
-Routes are usually written in `routes/web.php`, `routes/api.php`, or `routes/webhook.php`.
-
-`router()` returns the router. `route()` builds a named-route URL; use the route facade or `router()` to register endpoints:
+Routes are defined in `routes/web.php`, `routes/api.php`, or `routes/webhook.php`.
 
 ```php
 use Spark\Facades\Route;
-use App\Http\Controllers\UserController;
+use App\Http\Controllers\Api\PostController;
 
-Route::get('/users', [UserController::class, 'index'])->name('users.index');
-Route::get('/users/{id}', [UserController::class, 'show'])->name('users.show');
-Route::post('/users', [UserController::class, 'store'])->middleware('auth');
-Route::put('/users/{id}', [UserController::class, 'update']);
-Route::patch('/users/{id}', [UserController::class, 'update']);
-Route::delete('/users/{id}', [UserController::class, 'destroy']);
+Route::get('/posts', [PostController::class, 'index'])->name('posts.index');
+Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
+Route::get('/posts/{post}', [PostController::class, 'show'])->name('posts.show');
+Route::put('/posts/{post}', [PostController::class, 'update'])->name('posts.update');
+Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('posts.destroy');
 ```
 
-Supported route methods:
+### Route Model Binding
+
+TinyMVC features native route model binding. When a route parameter matches the name of a type-hinted `Model` in the controller action or closure, Spark automatically retrieves the model via `firstOrFail()`, returning a 404 response if not found.
+
+#### 1. Default Primary Key Binding (`id`)
 
 ```php
-Route::get($path, $callback);
-Route::post($path, $callback);
-Route::put($path, $callback);
-Route::patch($path, $callback);
-Route::delete($path, $callback);
-Route::options($path, $callback);
-Route::any($path, $callback);
-Route::match(['GET', 'POST'], $path, $callback);
-Route::view('/about', 'pages.about');
-Route::view('/email-preview', 'emails.welcome');
-Route::inertia('/contact', 'Contact', ['key' => 'value']); // Requires the Inertia adapter/provider
-Route::redirect('/old', '/new', 301);
-Route::fallback(fn() => response('Not found', 404));
+// Route parameter {post} matches controller argument Post $post
+Route::get('/posts/{post}', [PostController::class, 'show']);
 ```
 
-Route parameters:
+In the controller, type-hint the model parameter:
 
 ```php
-Route::get('/posts/{id}', fn(int $id) => "Post $id");
-Route::get('/posts/{id?}', fn(?string $id = null) => $id);
-Route::get('/files/*', fn() => 'wildcard');
+public function show(Post $post): PostResource
+{
+    return PostResource::make($post);
+}
 ```
 
-Route groups:
+#### 2. Custom Column Binding (`{param:column}`)
+
+You can specify a custom column for lookup directly in the route parameter definition using `{param:column}`:
 
 ```php
-use App\Http\Controllers\Api\UserController;
+// Binds by 'slug' instead of 'id'
+Route::get('/posts/{post:slug}', [PostController::class, 'show']);
+```
 
-Route::group(['prefix' => 'admin', 'middleware' => ['auth']], function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+In the controller, the model is resolved automatically via `Post::where('slug', $value)->firstOrFail()`:
+
+```php
+public function show(Post $post): PostResource
+{
+    return PostResource::make($post);
+}
+```
+
+---
+
+## Route Groups and Resource Routes
+
+### Route Groups
+
+```php
+use App\Http\Controllers\Api\PostController;
+
+Route::group(['prefix' => 'api/v1', 'middleware' => ['cors', 'auth:api']], function () {
+    Route::get('/posts', [PostController::class, 'index']);
+    Route::post('/posts', [PostController::class, 'store']);
 });
-
-Route::group(['prefix' => 'api', 'middleware' => ['cors'], 'withoutMiddleware' => ['csrf']], function () {
-    Route::get('/users', [UserController::class, 'index']);
-});
 ```
 
-Controller grouping:
-
-```php
-Route::group(['prefix' => 'users', 'callback' => UserController::class], function () {
-    Route::get('/', 'index')->name('users.index');
-    Route::post('/', 'store')->name('users.store');
-    Route::get('/{id}', 'show')->name('users.show');
-});
-```
-
-Resource routes:
+### Resource Routes
 
 ```php
 Route::resource('/posts', PostController::class, name: 'posts');
 ```
 
-Resource route method map:
-
+Mapped resource actions:
 - `GET /posts` -> `index`
 - `GET /posts/create` -> `create`
 - `POST /posts` -> `store`
-- `GET /posts/{id}` -> `show`
-- `GET /posts/{id}/edit` -> `edit`
-- `PUT/PATCH /posts/{id}` -> `update`
-- `DELETE /posts/{id}` -> `destroy`
+- `GET /posts/{post}` -> `show`
+- `GET /posts/{post}/edit` -> `edit`
+- `PUT/PATCH /posts/{post}` -> `update`
+- `DELETE /posts/{post}` -> `destroy`
 
-## Controllers
+---
 
-Generated controller stubs usually extend an app-level `Controller` class. Follow existing app convention.
+## Idiomatic API Controller Standard
 
-Example API controller:
+Always write clean, modern controllers combining **Route Model Binding**, **FormRequest**, and **JsonResource**:
 
 ```php
 <?php
@@ -103,66 +97,79 @@ Example API controller:
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controller;
+use App\Http\Requests\StorePostRequest;
+use App\Http\Requests\UpdatePostRequest;
+use App\Http\Resources\PostResource;
 use App\Models\Post;
 use Spark\Http\Request;
+use Spark\Http\Resources\ResourceCollection;
+use Spark\Http\Response;
 
 class PostController extends Controller
 {
-    public function index(): array
+    /**
+     * List posts with eager-loaded relations and pagination.
+     */
+    public function index(Request $request): ResourceCollection
     {
-        return [
-            'data' => Post::latest()->take(20)->all(),
-        ];
+        $posts = Post::with(['author', 'category'])
+            ->withCount('comments')
+            ->latest()
+            ->paginate(20);
+
+        return PostResource::collection($posts);
     }
 
-    public function show(int $id): array
+    /**
+     * Store a newly created post.
+     * FormRequest handles authorization and validation before this action runs.
+     */
+    public function store(StorePostRequest $request): Response
     {
-        $post = Post::findOrFail($id);
+        $post = Post::create($request->validated());
 
-        return ['data' => $post];
+        return PostResource::make($post)->response(201);
     }
 
-    public function store(Request $request): \Spark\Http\Response
+    /**
+     * Display a specific post via Route Model Binding.
+     */
+    public function show(Post $post): PostResource
     {
-        $data = $request->validate([
-            'title' => 'required|string|max:255',
-            'body' => 'required|string',
-        ]);
+        // Eager load relations for the loaded instance if needed
+        $post->load(['author', 'comments.author']);
 
-        $post = Post::create($data);
-
-        return json(['data' => $post], 201);
+        return PostResource::make($post);
     }
 
-    public function update(int $id, Request $request): array
+    /**
+     * Update an existing post.
+     */
+    public function update(UpdatePostRequest $request, Post $post): PostResource
     {
-        $post = Post::findOrFail($id);
-        $post->fill($request->validate([
-            'title' => 'required|string|max:255',
-            'body' => 'required|string',
-        ]));
+        $post->fill($request->validated());
         $post->save();
 
-        return ['data' => $post];
+        return PostResource::make($post);
     }
 
-    public function destroy(int $id): \Spark\Http\Response
+    /**
+     * Remove the specified post.
+     */
+    public function destroy(Post $post): Response
     {
-        Post::findOrFail($id)->remove();
+        // Always use $model->remove() on model instances (returns bool)
+        $post->remove();
 
-        return response('', 204);
+        return response()->noContent();
     }
 }
 ```
 
-Route callbacks and controller methods can return:
+### Key Controller Rules
 
-- `Spark\Http\Response`
-- string
-- integer HTTP status code
-- array
-- object castable to string
-- `Arrayable`
-
-Arrays are JSON encoded by `Response::send()`. The controller example shows the request/persistence shape; apply the app's authentication middleware and ownership authorization before changing private records.
-
+1. **Never return raw arrays or `json(['data' => ...])` for models**: Always return `PostResource::make($post)` or `PostResource::collection(...)`.
+2. **Never put validation logic inline in create/update actions**: Use dedicated `FormRequest` classes.
+3. **Use Route Model Binding**: Type-hint `Post $post` instead of manually finding models by ID in every action.
+4. **Use `$model->remove()` to delete**: Do not call `$model->delete()` on model instances.
+5. **Return `response()->noContent()`** for successful deletions.

@@ -1,84 +1,273 @@
-# Application patterns
+# Application Patterns and Architecture
 
-Use this reference when implementing endpoints, models, resources, services, or jobs. Examples use a fictional posts domain and the skill’s coding style. Adapt them to the installed APIs and existing application contracts.
+Use this reference when structuring endpoints, controllers, domain services, models, and JSON resources. Examples follow Spark's native idioms and coding conventions.
 
-## Choose the smallest useful structure
+## Core Architectural Layers
 
-- Keep route declarations focused on middleware and controller actions. Match the application's route grouping and naming. Use typed action parameters for request, bound model, and injected services where supported by the installed router/container.
-- Keep a short set of rules in `$request->validate(...)`. Use `App\Http\Requests\<Domain>` form requests when rules are substantial or reusable. Neither approach requires a new class for every endpoint.
-- Controllers coordinate validation, access checks, persistence, and the response. Domain decisions shared across actions belong in focused services with a clear business responsibility; external clients and stateful collaborators suit injection. Preserve established static helpers for small stateless operations instead of mechanically converting everything to dependency injection.
-- Model relationships and reusable filters belong on models. Use typed `scopeName(QueryBuilder $query, ...): QueryBuilder` methods. Keep domain-specific scopes such as `visibleTo` or `withApiData` in the app; they are not built-in Spark methods.
-- Use resources for repeated public representations. Small action results can return `json(['data' => ...])` directly. Preserve the endpoint's existing envelope, status codes, and field types.
+1. **Routing**: Define clean routes with **Route Model Binding** (`{post}` or `{post:slug}`).
+2. **Requests**: Validate and authorize via dedicated **`FormRequest`** classes.
+3. **Controllers**: Act as thin coordinators—inject form requests, models, and services, then return JSON resources.
+4. **Services**: Encapsulate business logic, multi-step operations, and transactions in dedicated classes under `app/Services`.
+5. **Models**: Manage relationships (`hasMany`, `belongsTo`), attribute casting (`$casts`), timestamps, and local scopes (`scopePublished`).
+6. **Resources**: Transform entities and collections into API documents via **`JsonResource`**.
 
-## A direct controller action
+---
 
-This method belongs in an authenticated controller importing `App\Models\Post`, `Spark\Http\Request`, and `Spark\Http\Response`. The example assumes an integer owner key and a fillable `title` field; adapt both to the actual schema.
+## 1. Clean Controller Action
 
 ```php
-public function update(Request $request, Post $post): Response
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controller;
+use App\Http\Requests\UpdatePostRequest;
+use App\Http\Resources\PostResource;
+use App\Models\Post;
+use App\Services\PostService;
+
+class PostController extends Controller
 {
-    abort_unless((int) $post->user_id === (int) $request->user('id'), 403);
+    /**
+     * Update an existing post.
+     * Route Model Binding automatically resolves Post $post.
+     * UpdatePostRequest handles authorization & validation prior to action execution.
+     */
+    public function update(UpdatePostRequest $request, Post $post, PostService $postService): PostResource
+    {
+        $updatedPost = $postService->update($post, $request->validated());
 
-    $input = $request->validate([
-        'title' => ['required', 'string', 'max:180'],
-    ]);
+        return PostResource::make($updatedPost);
+    }
+}
+```
 
-    $post->fill(['title' => $input->get('title')]);
+---
 
-    if (!$post->save()) {
-        abort(500, 'Unable to save the post.');
+## 2. Dedicated Domain Service (`app/Services`)
+
+Keep controllers thin by moving complex business logic, transactions, and external events into domain services:
+
+```php
+<?php
+
+namespace App\Services;
+
+use App\Models\Post;
+use Spark\Facades\DB;
+use Spark\Http\Requests\Input;
+use RuntimeException;
+
+class PostService
+{
+    /**
+     * Update post and synchronize associated tags within a transaction.
+     */
+    public function update(Post $post, Input $data): Post
+    {
+        return DB::transaction(function () use ($post, $data): Post {
+            $post->fill($data);
+
+            if (!$post->save()) {
+                throw new RuntimeException('Failed to update post.');
+            }
+
+            if ($data->has('tags')) {
+                $post->tags()->sync($data->array('tags'));
+            }
+
+            return $post;
+        });
     }
 
-    return json([
-        'data' => [
-            'id' => $post->id,
-            'title' => $post->title,
-        ],
-    ]);
+    /**
+     * Publish post and trigger notifications.
+     */
+    public function publish(Post $post): Post
+    {
+        $post->update([
+            'published' => true,
+            'published_at' => now(),
+        ]);
+
+        // Dispatch background jobs or domain events
+        // PublishNotificationJob::dispatch($post->id);
+
+        return $post;
+    }
 }
 ```
 
-Match the application's 403/404 policy for inaccessible records. Route binding alone is not authorization. Do not take owner IDs, counters, or lifecycle state from untrusted input just because a model makes them fillable. Check optional values deliberately; validation does not make every field required.
+---
 
-## Query shape and response shape together
+## 3. Query Scopes & Native Relations on Models
 
-Compose visibility and API-loading scopes before pagination. Use direct `query('table')` calls for narrowly scoped existence/count queries. Use either according to whether model behavior and casts are needed. Prefer `exists()` for an existence check rather than loading all rows.
-
-This scope belongs on an application model with a `user_id` column and imports `Spark\Database\QueryBuilder`:
+Encapsulate reusable query logic inside local model scopes and native relationships:
 
 ```php
-public function scopeOwnedBy(QueryBuilder $query, int $userId): QueryBuilder
+<?php
+
+namespace App\Models;
+
+use Spark\Database\Model;
+use Spark\Database\QueryBuilder;
+use Spark\Database\Relation\BelongsTo;
+use Spark\Database\Relation\BelongsToMany;
+use Spark\Database\Relation\HasMany;
+
+class Post extends Model
 {
-    return $query->where('user_id', $userId);
-}
-```
-
-Keep the owner/visibility scope on mutations as well as reads. Group OR conditions so they cannot escape ownership filters. Bound page size at the endpoint according to its contract. Start independent operations from fresh builders.
-
-Load the relations and counts needed by a resource before serialization. For example, an action using `Post::query()->with('author')->withCount('comments')` can return `PostResource::collection($posts)` after pagination. The app must define those relations and resources. In `PostResource`, importing `Spark\Http\Request` and extending `Spark\Http\Resources\JsonResource`:
-
-```php
-public function toArray(?Request $request = null): array
-{
-    return [
-        'id' => $this->id,
-        'title' => $this->title,
-        'author' => $this->whenLoaded('author', AuthorResource::make(...)),
-        'comments_count' => $this->whenCounted('comments'),
+    protected array $fillable = [
+        'user_id',
+        'title',
+        'slug',
+        'content',
+        'published',
+        'published_at',
     ];
+
+    protected array $casts = [
+        'published' => 'boolean',
+        'published_at' => 'datetime',
+    ];
+
+    /**
+     * Scope: Filter posts owned by a user.
+     */
+    public function scopeOwnedBy(QueryBuilder $query, int $userId): QueryBuilder
+    {
+        return $query->where('user_id', $userId);
+    }
+
+    /**
+     * Scope: Filter published posts.
+     */
+    public function scopePublished(QueryBuilder $query): QueryBuilder
+    {
+        return $query->where('published', true)->whereNotNull('published_at');
+    }
+
+    public function author(): BelongsTo
+    {
+        return $this->belongsTo(User::class, foreignKey: 'user_id');
+    }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class, foreignKey: 'post_id');
+    }
+
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class, table: 'post_tags');
+    }
 }
 ```
 
-`AuthorResource` is an application resource in the same namespace. `whenLoaded` avoids loading a relation while serializing. Test both loaded and omitted fields, null relations, and query counts for list endpoints. Do not expose a whole model merely to avoid defining the public representation.
+---
 
-## Shared writes and background work
+## 4. API Representation via JsonResource
 
-Keep related writes inside the installed `DB::transaction()` API when they must commit together. Check affected-row counts before adjusting derived counters. Choose transaction and locking boundaries around the actual invariant; do not copy a zero-increment write or locking helper as a universal recipe. Verify the selected driver's behavior and add contention/idempotency checks when relevant.
+```php
+<?php
 
-Keep job payloads small: store identifiers and needed scalar data, then resolve current records in `handle()`. Use Spark's `JobInterface` and `Dispatchable` with the installed retry/backoff contract. Decide what a deleted target means, and ensure retrying an external side effect is safe. Dispatch explicitly after the outer commit when a worker must observe committed records; use the [outbox guidance](advanced-workflows.md#commit-dispatch-and-external-effects) when the commit/dispatch crash window matters. Do not assume a built-in `afterCommit()` method; do not substitute `defer()` for durable work.
+namespace App\Http\Resources;
 
-## Finish the feature
+use App\Models\Post;
+use Spark\Http\Request;
+use Spark\Http\Resources\JsonResource;
 
-Cover the successful action, invalid input, guest/other-owner access, and stored state. For list endpoints, test visibility, pagination, and serialization without extra queries. For multi-step writes, test rollback and unaffected neighboring records. Reuse the app's test base and fixtures. Keep the existing frontend integration and build it only when relevant files change.
+/**
+ * @mixin Post
+ */
+class PostResource extends JsonResource
+{
+    public function toArray(?Request $request = null): array
+    {
+        return [
+            'id' => $this->id,
+            'title' => $this->title,
+            'slug' => $this->slug,
+            'content' => $this->content,
+            'published' => $this->published,
 
-Preserve grouped imports when the file uses them; do not churn imports across unrelated files. Normalize newly written arrows to `fn (...) => ...`, use deliberate blank lines, and break long chains at method boundaries. Keep examples domain-neutral and preserve established business rules.
+            // Relations loaded via with() or load()
+            'author' => $this->whenLoaded('author', fn() => UserResource::make($this->author)),
+            'tags' => $this->whenLoaded('tags', fn() => TagResource::collection($this->tags)),
+            'comments_count' => $this->whenCounted('comments'),
+
+            // Carbon instances are automatically converted to ISO-8601 UTC strings!
+            'published_at' => $this->published_at,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+        ];
+    }
+}
+```
+
+---
+
+## 5. Complete CRUD Resource Controller
+
+A complete, production-ready controller:
+
+```php
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controller;
+use App\Http\Requests\StorePostRequest;
+use App\Http\Requests\UpdatePostRequest;
+use App\Http\Resources\PostResource;
+use App\Models\Post;
+use Spark\Http\Request;
+use Spark\Http\Resources\ResourceCollection;
+use Spark\Http\Response;
+
+class PostController extends Controller
+{
+    public function index(Request $request): ResourceCollection
+    {
+        $posts = Post::with(['author', 'tags'])
+            ->withCount('comments')
+            ->published()
+            ->latest()
+            ->paginate(20);
+
+        return PostResource::collection($posts);
+    }
+
+    public function store(StorePostRequest $request): Response
+    {
+        $data = $request->validated();
+        $data['user_id'] = $request->auth()->id();
+
+        $post = Post::create($data);
+
+        return PostResource::make($post)->response(201);
+    }
+
+    public function show(Post $post): PostResource
+    {
+        $post->load(['author', 'tags']);
+
+        return PostResource::make($post);
+    }
+
+    public function update(UpdatePostRequest $request, Post $post): PostResource
+    {
+        $post->fill($request->validated());
+        $post->save();
+
+        return PostResource::make($post);
+    }
+
+    public function destroy(Post $post): Response
+    {
+        $post->delete();
+
+        return response()->noContent();
+    }
+}
+```
