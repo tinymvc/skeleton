@@ -1,52 +1,91 @@
-# Application Patterns and Architecture
+# Application patterns and architecture
 
-Use this reference when structuring endpoints, controllers, domain services, models, and JSON resources. Examples follow Spark's native idioms and coding conventions.
+Read this reference when structuring routes, controllers, FormRequests, models, services, jobs, or JSON resources. The examples use the installed Spark contracts and are intentionally small; adapt fields and ownership rules to the target app.
 
-## Core Architectural Layers
+## The default request path
 
-1. **Routing**: Define clean routes with **Route Model Binding** (`{post}` or `{post:slug}`).
-2. **Requests**: Validate and authorize via dedicated **`FormRequest`** classes.
-3. **Controllers**: Act as thin coordinators—inject form requests, models, and services, then return JSON resources.
-4. **Services**: Encapsulate business logic, multi-step operations, and transactions in dedicated classes under `app/Services`.
-5. **Models**: Manage relationships (`hasMany`, `belongsTo`), attribute casting (`$casts`), timestamps, and local scopes (`scopePublished`).
-6. **Resources**: Transform entities and collections into API documents via **`JsonResource`**.
+For a JSON resource endpoint, keep the path visible and predictable:
 
----
+1. A named route uses `{post}` or `{post:slug}` when ordinary model binding is sufficient.
+2. A FormRequest owns meaningful input validation and authorization.
+3. A controller coordinates the request, bound model, query, service, and resource.
+4. A model owns casts, relations, and reusable scopes.
+5. A service owns a multi-step business workflow or transaction.
+6. A JsonResource owns the public API field list and nested resource shape.
 
-## 1. Clean Controller Action
+The same domain service can serve an API controller, a Blade controller, a FireLine action, a job, or a command. The response layer changes with the frontend contract; the domain rules do not.
+
+## A thin API controller
 
 ```php
 <?php
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controller;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\StorePostRequest;
 use App\Http\Requests\UpdatePostRequest;
 use App\Http\Resources\PostResource;
 use App\Models\Post;
 use App\Services\PostService;
+use Spark\Http\Resources\ResourceCollection;
+use Spark\Http\Response;
 
 class PostController extends Controller
 {
-    /**
-     * Update an existing post.
-     * Route Model Binding automatically resolves Post $post.
-     * UpdatePostRequest handles authorization & validation prior to action execution.
-     */
-    public function update(UpdatePostRequest $request, Post $post, PostService $postService): PostResource
+    public function index(): ResourceCollection
     {
-        $updatedPost = $postService->update($post, $request->validated());
+        $posts = Post::with(['author', 'tags'])
+            ->withCount('comments')
+            ->published()
+            ->latest()
+            ->paginate(20);
 
-        return PostResource::make($updatedPost);
+        return PostResource::collection($posts);
+    }
+
+    public function store(StorePostRequest $request): Response
+    {
+        $input = $request->validated(); // Input implements ArrayAccess, Arrayable and tinycore/spark supports Arrayable
+        $input['user_id'] = $request->user('id');
+
+        $post = Post::create($input);
+
+        return PostResource::make($post)->response(201);
+    }
+
+    public function show(Post $post): PostResource
+    {
+        $post->load(['author', 'tags']);
+
+        return PostResource::make($post);
+    }
+
+    public function update(
+        UpdatePostRequest $request,
+        Post $post,
+        PostService $postService,
+    ): PostResource
+    {
+        $post = $postService->update($post, $request->validated());
+
+        return PostResource::make($post);
+    }
+
+    public function destroy(Post $post): Response
+    {
+        if (!$post->remove()) {
+            abort(500, 'Unable to remove the post.');
+        }
+
+        return response()->noContent();
     }
 }
 ```
 
----
+Do not add a service merely to call `Post::create()` or `PostResource::make()`. Inject a service when the action coordinates a transaction, multiple models, relation synchronization, cache/storage invalidation, external effects, or a reusable domain rule.
 
-## 2. Dedicated Domain Service (`app/Services`)
-
-Keep controllers thin by moving complex business logic, transactions, and external events into domain services:
+## A focused service
 
 ```php
 <?php
@@ -54,55 +93,48 @@ Keep controllers thin by moving complex business logic, transactions, and extern
 namespace App\Services;
 
 use App\Models\Post;
-use Spark\Facades\DB;
 use Spark\Http\Requests\Input;
 use RuntimeException;
+use Spark\Facades\DB;
 
 class PostService
 {
-    /**
-     * Update post and synchronize associated tags within a transaction.
-     */
     public function update(Post $post, Input $data): Post
     {
         return DB::transaction(function () use ($post, $data): Post {
             $post->fill($data);
 
-            if (!$post->save()) {
-                throw new RuntimeException('Failed to update post.');
+            if (! $post->save()) {
+                throw new RuntimeException('Unable to save the post.');
             }
 
             if ($data->has('tags')) {
-                $post->tags()->sync($data->array('tags'));
+                $post->tags()->sync($data['tags']);
             }
 
             return $post;
         });
     }
 
-    /**
-     * Publish post and trigger notifications.
-     */
     public function publish(Post $post): Post
     {
-        $post->update([
+        $post->fill([
             'published' => true,
             'published_at' => now(),
         ]);
 
-        // Dispatch background jobs or domain events
-        // PublishNotificationJob::dispatch($post->id);
+        if (!$post->save()) {
+            throw new RuntimeException('Unable to publish the post.');
+        }
 
         return $post;
     }
 }
 ```
 
----
+Pass arrays or `Spark\Http\Input` deliberately. Convert `validated()` to `all()` at the controller boundary when the service contract is an array. Keep authorization outside the service when it is request-specific, or pass an explicit actor when the rule belongs in the domain workflow.
 
-## 3. Query Scopes & Native Relations on Models
-
-Encapsulate reusable query logic inside local model scopes and native relationships:
+## Model scopes, casts, and relations
 
 ```php
 <?php
@@ -131,20 +163,11 @@ class Post extends Model
         'published_at' => 'datetime',
     ];
 
-    /**
-     * Scope: Filter posts owned by a user.
-     */
-    public function scopeOwnedBy(QueryBuilder $query, int $userId): QueryBuilder
-    {
-        return $query->where('user_id', $userId);
-    }
-
-    /**
-     * Scope: Filter published posts.
-     */
     public function scopePublished(QueryBuilder $query): QueryBuilder
     {
-        return $query->where('published', true)->whereNotNull('published_at');
+        return $query
+            ->where('published', true)
+            ->whereNotNull('published_at');
     }
 
     public function author(): BelongsTo
@@ -159,14 +182,19 @@ class Post extends Model
 
     public function tags(): BelongsToMany
     {
-        return $this->belongsToMany(Tag::class, table: 'post_tags');
+        return $this->belongsToMany(
+            related: Tag::class,
+            table: 'post_tags',
+            foreignPivotKey: 'post_id',
+            relatedPivotKey: 'tag_id',
+        );
     }
 }
 ```
 
----
+Use `Post::query()`, `Post::where(...)`, `Post::findOrFail(...)`, `Post::with(...)`, or a scope for a model-backed table. Use `with()` on list queries and `load()` on a bound model before a resource needs relations. Define relation names that describe the domain and use `whereHas()`, `whereRelation*()`, `withCount()`, `withExists()`, and aggregates rather than fetching unrelated rows and filtering in PHP.
 
-## 4. API Representation via JsonResource
+## A resource is an API boundary
 
 ```php
 <?php
@@ -178,7 +206,7 @@ use Spark\Http\Request;
 use Spark\Http\Resources\JsonResource;
 
 /**
- * @mixin Post
+ * @extends JsonResource<Post>
  */
 class PostResource extends JsonResource
 {
@@ -190,13 +218,9 @@ class PostResource extends JsonResource
             'slug' => $this->slug,
             'content' => $this->content,
             'published' => $this->published,
-
-            // Relations loaded via with() or load()
-            'author' => $this->whenLoaded('author', fn() => UserResource::make($this->author)),
-            'tags' => $this->whenLoaded('tags', fn() => TagResource::collection($this->tags)),
+            'author' => $this->whenLoaded('author', fn ($author) => UserResource::make($author)),
+            'tags' => $this->whenLoaded('tags', fn ($tags) => TagResource::collection($tags)),
             'comments_count' => $this->whenCounted('comments'),
-
-            // Carbon instances are automatically converted to ISO-8601 UTC strings!
             'published_at' => $this->published_at,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
@@ -205,69 +229,13 @@ class PostResource extends JsonResource
 }
 ```
 
----
+Do not call `Carbon::parse($this->created_at)` or `$this->created_at->toIsoUtcString()` here. Model timestamps and `datetime`/`date` casts are already `Spark\Carbon` values, and `JsonResource::normalize()` recursively converts them to ISO UTC strings. Format a date manually only when the product contract explicitly asks for a display string, such as a localized Blade label.
 
-## 5. Complete CRUD Resource Controller
+## Non-API response modes
 
-A complete, production-ready controller:
+- Blade: query through models/services, then `return view('posts.show', ['post' => $post]);`; use redirects for successful writes and normal session validation flow.
+- FireLine: preserve the installed adapter's `fire()`/`Fire::render()` response, message/error envelope, and redirect behavior. Read [frontend setup](frontend-setup.md) before changing a FireLine form.
+- Inertia: use the installed adapter's `inertia()`/`Inertia::render()` response and redirect after writes. Props are public response data, so select fields and authorize them explicitly.
+- JSON webhooks or scalar endpoints: use `json()` when the external contract is not an entity resource. Keep the documented keys and status codes stable.
 
-```php
-<?php
-
-namespace App\Http\Controllers\Api;
-
-use App\Http\Controller;
-use App\Http\Requests\StorePostRequest;
-use App\Http\Requests\UpdatePostRequest;
-use App\Http\Resources\PostResource;
-use App\Models\Post;
-use Spark\Http\Request;
-use Spark\Http\Resources\ResourceCollection;
-use Spark\Http\Response;
-
-class PostController extends Controller
-{
-    public function index(Request $request): ResourceCollection
-    {
-        $posts = Post::with(['author', 'tags'])
-            ->withCount('comments')
-            ->published()
-            ->latest()
-            ->paginate(20);
-
-        return PostResource::collection($posts);
-    }
-
-    public function store(StorePostRequest $request): Response
-    {
-        $data = $request->validated();
-        $data['user_id'] = $request->auth()->id();
-
-        $post = Post::create($data);
-
-        return PostResource::make($post)->response(201);
-    }
-
-    public function show(Post $post): PostResource
-    {
-        $post->load(['author', 'tags']);
-
-        return PostResource::make($post);
-    }
-
-    public function update(UpdatePostRequest $request, Post $post): PostResource
-    {
-        $post->fill($request->validated());
-        $post->save();
-
-        return PostResource::make($post);
-    }
-
-    public function destroy(Post $post): Response
-    {
-        $post->delete();
-
-        return response()->noContent();
-    }
-}
-```
+The controller may share a service with all four modes. Keep representation-specific work in the controller/resource/adapter layer rather than leaking JSON envelopes into a Blade or Inertia action.

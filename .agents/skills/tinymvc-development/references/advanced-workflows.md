@@ -19,10 +19,10 @@ A conditional write is often simpler than read-then-write. This example assumes 
 
 ```php
 use Spark\Facades\DB;
+use App\Models\Order;
 
 $changed = DB::transaction(function () use ($orderId, $userId): int {
-    return DB::table('orders')
-        ->where('id', $orderId)
+    return Order::whereKey($orderId)
         ->where('user_id', $userId)
         ->where('status', 'pending')
         ->update(['status' => 'paid']);
@@ -34,7 +34,7 @@ if ($changed !== 1) {
 }
 ```
 
-This is a table write: it bypasses model casts/events. Use a model instance when those contracts matter. Do not infer affected-row counts from `increment()` / `decrement()`; their current return contract is boolean. Use an explicit conditional update when the number of transitioned rows is the decision input.
+This is a model query write: it preserves the model table and query scopes but does not hydrate an instance or run instance save callbacks. Use a model instance when casts/events or the updated representation matter. Do not infer affected-row counts from `increment()` / `decrement()`; their current return contract is boolean. Use an explicit conditional update when the number of transitioned rows is the decision input.
 
 For read/compute/write invariants, load the row under `lockForUpdate()` inside the same connection's transaction, then mutate before commit. Acquire multiple locks in a stable order. SQLite omits SELECT row-lock clauses; use a strategy verified on that driver rather than assuming MySQL/PostgreSQL semantics. Nested transaction callbacks use savepoints, not independent durable commits. Transactions have no automatic deadlock retry; retry only the whole retry-safe unit with a bounded policy. Do not put an irreversible HTTP/payment/email action inside that retry loop.
 

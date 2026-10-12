@@ -12,7 +12,7 @@ $now = now();
 
 // Parsing dates
 $date = carbon('2026-10-11 14:30:00');
-$parsed = Carbon::parse('next Monday');
+$parsed = \Spark\Carbon::parse('next Monday');
 
 // Common calculations
 $tomorrow = now()->addDays(1);

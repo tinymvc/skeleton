@@ -20,7 +20,7 @@ response('OK', 200);
 json(['ok' => true]);
 redirect('/login');
 back();
-defer(fn() => tracer_log('response_sent'));
+defer(fn () => tracer_log('response_sent'));
 
 router();
 route_url('users.show', ['id' => 5]);
@@ -35,7 +35,7 @@ gate();
 authorize('update-post', $post);
 
 db();
-query('users');
+query('framework_table'); // Low-level only; use User::query() for a User model.
 cache('default');
 lock('key');
 

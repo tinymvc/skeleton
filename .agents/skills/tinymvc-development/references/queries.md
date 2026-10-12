@@ -74,11 +74,10 @@ $posts = DB::table('posts')
 $posts = Post::whereRelation('author', 'role', 'admin')->get();
 
 // GOOD: Filtering with relation closure
-$posts = Post::whereHas('comments', fn($q) => $q->where('approved', true))->get();
+$posts = Post::whereHas('comments', fn ($query) => $query->where('approved', true))->get();
 
 // GOOD: Eager loading and counts
-$posts = Post::query()
-    ->with(['author', 'category'])
+$posts = Post::with(['author', 'category'])
     ->withCount('comments')
     ->latest()
     ->get();
@@ -94,7 +93,7 @@ Common QueryBuilder / Model methods:
 - **Conditions**: `where('status', 'active')`, `orWhere('role', 'admin')`, `whereNull('deleted_at')`, `whereNotNull('published_at')`
 - **Lists & Ranges**: `whereIn('id', [1, 2, 3])`, `whereNotIn('status', ['archived'])`, `between('age', 18, 65)`
 - **Strings**: `whereContains('bio', 'engineer')`, `whereStartsWith('sku', 'SPARK-')`, `whereEndsWith('email', '@example.com')`, `like('name', '%John%')`
-- **Dates**: `whereDate('created_at', '2026-10-11')`, `whereYear('created_at', 2026)`, `whereMonth('created_at', 10)`
+- **Dates**: `whereDate('created_at', '=', '2026-10-11')`, `whereYear('created_at', '=', 2026)`, `whereMonth('created_at', '=', 10)`
 - **Relations**: `with()`, `withExists()`, `withCount()`, `withSum()`, `withAvg()`, `whereHas()`, `whereDoesntHave()`, `whereRelation()`
 - **Ordering**: `orderBy('id', 'DESC')`, `orderDesc('id')`, `orderAsc('name')`, `latest()`, `oldest()`, `random()`
 - **Limiting**: `take(10)`, `skip(20)`, `limit(offset: 0, limit: 10)`
@@ -126,12 +125,20 @@ Product::upsert(
 
 Use `Spark\Facades\DB::transaction()` to execute multi-step database writes atomically:
 
+The example assumes `$userId` and `$items` came from a validated request; the total is calculated before opening the transaction.
+
 ```php
 use Spark\Facades\DB;
 use App\Models\User;
 use App\Models\Order;
 
-$order = DB::transaction(function () use ($userId, $items): Order {
+$total = array_reduce(
+    $items,
+    static fn (float $sum, array $item): float => $sum + $item['total'],
+    0.0,
+);
+
+$order = DB::transaction(function () use ($userId, $items, $total): Order {
     $user = User::whereKey($userId)->lockForUpdate()->firstOrFail();
 
     if ($user->balance < $total) {

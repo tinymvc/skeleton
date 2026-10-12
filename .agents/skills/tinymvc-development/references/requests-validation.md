@@ -84,7 +84,7 @@ public function store(StorePostRequest $request): Response
     // If authorize() returned false -> 403 Forbidden was thrown before reaching here.
     // If rules failed -> 422 Unprocessable Entity was thrown before reaching here.
 
-    $post = Post::create($request->validated());
+    $post = Post::create($request->validated()); // Note: tinycore/spark supports Arrayable
 
     return PostResource::make($post)->response(201);
 }
@@ -104,18 +104,18 @@ public function store(StorePostRequest $request): Response
 Reserve inline `$request->validate([...])` **only** for lightweight search filters or simple single-field endpoints where a dedicated FormRequest would be excessive:
 
 ```php
-public function index(Request $request): Response
+public function index(\Spark\Http\Request $request): \Spark\Http\Resources\ResourceCollection
 {
     $validated = $request->validate([
         'q' => 'nullable|string|max:100',
         'status' => ['nullable', 'string', ['in' => ['draft', 'published']]],
     ]);
 
-    $query = Post::query();
-
-    if ($search = $validated->get('q')) {
-        $query->where('title', 'LIKE', "%{$search}%");
-    }
+    $query = Post::query()
+        ->when(
+            $validated->has('q'),
+            fn($query) => $query->whereLike('title', "%{$search}%");
+        );
 
     return PostResource::collection($query->latest()->paginate(20));
 }

@@ -74,16 +74,16 @@ class Post extends Model
   - Disable with `protected const USE_TIMESTAMPS = false;`.
 
 ### Model Actions & Lifecycle
-- **Creation**: `Post::create($validated)` returns a newly persisted, hydrated `Post` instance.
+- **Creation**: `Post::create($validated)` returns a newly persisted, hydrated `Post` instance. Pass an array or `Spark\Http\Input` deliberately.
 - **Filling**: `$post->fill($validated)` populates fillable attributes in memory.
 - **Saving**: `$post->save()` persists changes and returns a `bool`.
-- **Deleting an Instance**: `$post->delete()` or `$post->remove()` to delete a loaded model instance (returns `bool`).
+- **Deleting an Instance**: `$post->remove()` deletes a loaded model instance and returns `bool`. Query-builder `delete()` returns an affected-row count and has different lifecycle behavior.
 
 ---
 
 ## Native Relationships
 
-Always use TinyCore's native ORM relationships instead of writing manual `join()` or `whereRaw()` queries.
+Prefer TinyCore's native ORM relationships over manual `join()` or `whereRaw()` queries whenever the relationship expresses the requirement. Use a parameterized low-level query only when there is no useful model/relation or the task explicitly requires a database-specific projection.
 
 ### 1. Defining Relationships
 
@@ -117,7 +117,7 @@ public function tags(): BelongsToMany
     );
 }
 
-// Has-Many-Through
+// Inside User: Has-Many-Through User -> Post -> Comment
 public function comments(): HasManyThrough
 {
     return $this->hasManyThrough(

@@ -64,16 +64,19 @@ public function show(Post $post): PostResource
 ```php
 use App\Http\Controllers\Api\PostController;
 
-Route::group(['prefix' => 'api/v1', 'middleware' => ['cors', 'auth:api']], function () {
+Route::group(function () {
     Route::get('/posts', [PostController::class, 'index']);
     Route::post('/posts', [PostController::class, 'store']);
-});
+})
+    ->prefix('api/v1')
+    ->middleware(['cors', 'auth:api']);
 ```
 
 ### Resource Routes
 
 ```php
-Route::resource('/posts', PostController::class, name: 'posts');
+Route::resource('/posts', PostController::class, name: 'posts')
+    ->except(['show', 'edit']); // ->only([]) ...
 ```
 
 Mapped resource actions:
@@ -96,12 +99,11 @@ Always write clean, modern controllers combining **Route Model Binding**, **Form
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controller;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePostRequest;
 use App\Http\Requests\UpdatePostRequest;
 use App\Http\Resources\PostResource;
 use App\Models\Post;
-use Spark\Http\Request;
 use Spark\Http\Resources\ResourceCollection;
 use Spark\Http\Response;
 
@@ -110,7 +112,7 @@ class PostController extends Controller
     /**
      * List posts with eager-loaded relations and pagination.
      */
-    public function index(Request $request): ResourceCollection
+    public function index(): ResourceCollection
     {
         $posts = Post::with(['author', 'category'])
             ->withCount('comments')
@@ -148,7 +150,10 @@ class PostController extends Controller
     public function update(UpdatePostRequest $request, Post $post): PostResource
     {
         $post->fill($request->validated());
-        $post->save();
+
+        if (!$post->save()) {
+            abort(500, 'Unable to save the post.');
+        }
 
         return PostResource::make($post);
     }
@@ -158,8 +163,9 @@ class PostController extends Controller
      */
     public function destroy(Post $post): Response
     {
-        // Always use $model->remove() on model instances (returns bool)
-        $post->remove();
+        if (!$post->remove()) {
+            abort(500, 'Unable to remove the post.');
+        }
 
         return response()->noContent();
     }
@@ -168,7 +174,7 @@ class PostController extends Controller
 
 ### Key Controller Rules
 
-1. **Never return raw arrays or `json(['data' => ...])` for models**: Always return `PostResource::make($post)` or `PostResource::collection(...)`.
+1. **Use resources for entity payloads**: Return `PostResource::make($post)` or `PostResource::collection(...)`; reserve `json()` for intentional message/scalar/webhook contracts.
 2. **Never put validation logic inline in create/update actions**: Use dedicated `FormRequest` classes.
 3. **Use Route Model Binding**: Type-hint `Post $post` instead of manually finding models by ID in every action.
 4. **Use `$model->remove()` to delete**: Do not call `$model->delete()` on model instances.

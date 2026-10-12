@@ -30,9 +30,9 @@ Use this file to choose the right framework APIs; use the installed implementati
 Prefer these choices:
 
 - Routes: use `Spark\Facades\Route` when the app imports it, otherwise use `router()`.
-- Controllers: return arrays for JSON APIs, `json()` for explicit status codes, and `response()` for plain responses.
-- Validation: use `Spark\Foundation\Http\FormRequest` for reusable request validation, or `$request->validate()` for simple cases.
-- Database: use `Spark\Database\Model` or `query($table)` before raw SQL.
+- Controllers: return `JsonResource`/`ResourceCollection` for JSON entities and lists, `json()` for intentional message/scalar contracts, and `view()`/redirects for browser responses.
+- Validation: use `Spark\Foundation\Http\FormRequest` for meaningful writes and authorization; reserve `$request->validate()` for small filters or trivial actions.
+- Database: use `Spark\Database\Model` static queries, scopes, and relations for domain tables; use `query($table)` only for unmodeled/framework or deliberately low-level work.
 - Background work: use class jobs with `Spark\Queue\Dispatchable`; use `dispatchOnce()` for recurring scheduler/cron jobs.
 - Paths: use config and helpers such as `storage_dir()`, `root_dir()`, `upload_dir()`, and `views_dir()`.
 - Framework uncertainty: inspect the matching source file under `./vendor/tinymvc/tinycore/src/` before guessing Laravel behavior.
@@ -43,12 +43,12 @@ For a new API resource, use only the pieces the feature needs; reuse existing sc
 
 1. Create migration in `database/migrations`.
 2. Create model in `app/Models`.
-3. Create request class in `app/Http/Requests` if validation is more than trivial.
+3. Create request class in `app/Http/Requests` for create/update/state-changing workflows and any meaningful authorization/validation.
 4. Create controller in `app/Http/Controllers/Api`.
 5. Add routes in `routes/api.php`.
 6. Add middleware only if needed.
-7. Return arrays or `json()` responses for APIs.
-8. Use model/query builder APIs, not raw SQL.
+7. Create a `JsonResource` and return `Resource::make()`/`Resource::collection()` for entity payloads; use `json()` only for an intentional non-resource contract.
+8. Use model/query builder APIs and native relations, not raw table queries for model-backed entities.
 
 Example:
 
@@ -59,9 +59,9 @@ use Spark\Facades\Route;
 
 Route::get('/posts', [PostController::class, 'index']);
 Route::post('/posts', [PostController::class, 'store']);
-Route::get('/posts/{id}', [PostController::class, 'show']);
-Route::put('/posts/{id}', [PostController::class, 'update']);
-Route::delete('/posts/{id}', [PostController::class, 'destroy']);
+Route::get('/posts/{post}', [PostController::class, 'show']);
+Route::put('/posts/{post}', [PostController::class, 'update']);
+Route::delete('/posts/{post}', [PostController::class, 'destroy']);
 ```
 
 ## Common Mistakes To Avoid
@@ -69,7 +69,7 @@ Route::delete('/posts/{id}', [PostController::class, 'destroy']);
 - Do not import Laravel's route facade. Use `Spark\Facades\Route` or `router()` depending on the app style.
 - Do not import `Illuminate\\*` classes.
 - Do not create Laravel `FormRequest`, `Middleware`, `Migration`, or `Model` classes.
-- Do not use `artisan`; TinyMVC has its own console command system.
+- Do not use `artisan`; TinyMVC has its own console command system through `php spark`.
 - Do not assume Eloquent relationship syntax is identical. Inspect existing models.
 - Do not edit framework/vendor files in an app unless asked.
 - Do not bypass config with hardcoded storage paths.

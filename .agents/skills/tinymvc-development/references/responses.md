@@ -4,7 +4,7 @@ Read this reference for HTTP responses, JSON resources, redirects, and API contr
 
 ## API Responses and JSON Resources
 
-For APIs, always prefer **`Spark\Http\Resources\JsonResource`** for entity and collection presentation. Do **not** manually construct ad-hoc response arrays such as `json(['data' => [...]])` or `return ['data' => $post]` in controllers.
+For APIs, use **`Spark\Http\Resources\JsonResource`** for entity and collection presentation. Do **not** manually construct an entity envelope such as `json(['data' => $post])` or `return ['data' => $post]` in a resource controller. Use `json()` for a message, scalar, webhook, or other intentionally non-resource contract.
 
 ### Standard Controller Responses
 
@@ -58,8 +58,8 @@ class PostResource extends JsonResource
             'content' => $this->content,
 
             // Relations: use whenLoaded() to avoid unintended N+1 queries
-            'author' => $this->whenLoaded('author', fn() => UserResource::make($this->author)),
-            'comments' => $this->whenLoaded('comments', fn() => CommentResource::collection($this->comments)),
+            'author' => $this->whenLoaded('author', fn ($author) => UserResource::make($author)),
+            'comments' => $this->whenLoaded('comments', fn ($comments) => CommentResource::collection($comments)),
             'comments_count' => $this->whenCounted('comments'),
 
             // Dates: do NOT manually call Carbon::parse() or ->toIsoUtcString()!
@@ -114,10 +114,10 @@ Use built-in conditional helpers to omit keys when conditions are not met:
 ```php
 return [
     'id' => $this->id,
-    'secret' => $this->when($request?->user()?->isAdmin(), $this->secret),
-    'author' => $this->whenLoaded('author', fn() => UserResource::make($this->author)),
+    'secret' => $this->when($request?->user('is_admin'), $this->secret),
+    'author' => $this->whenLoaded('author', fn ($author) => UserResource::make($author)),
     'tags_count' => $this->whenCounted('tags'),
-    ...$this->when($this->is_featured, fn() => [
+    ...$this->when($this->is_featured, fn () => [
         'featured_at' => $this->featured_at,
         'badge' => 'Featured',
     ], []),

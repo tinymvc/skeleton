@@ -67,7 +67,7 @@ Expiration is a date/time string accepted by the cache implementation; prefer ex
 ```php
 $products = cache('catalog')->remember(
     'featured',
-    fn() => Product::where('featured', true)->take(12)->all(),
+    fn () => Product::where('featured', true)->take(12)->all(),
     '+10 minutes',
 );
 ```

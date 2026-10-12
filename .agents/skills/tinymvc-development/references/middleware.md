@@ -51,7 +51,7 @@ Attach middleware:
 ```php
 Route::get('/admin', [AdminController::class, 'index'])->middleware(['auth', 'admin']);
 Route::post('/webhook', [WebhookController::class, 'store'])->withoutMiddleware('csrf');
-Route::get('/limited', fn() => 'ok')->middleware('throttle:60,1,api');
+Route::get('/limited', fn () => 'ok')->middleware('throttle:60,1,api');
 ```
 
 Middleware parameters are parsed after `:`, comma-separated.
