@@ -32,14 +32,20 @@ Request file helpers:
 
 ```php
 if ($request->hasFile('avatar')) {
-    $file = $request->file('avatar');
-    $request->moveFile('avatar', storage_dir('uploads/avatar.jpg'));
+    $uploadPath = $request->moveFile('avatar', disk: 'public', options: [
+        'uploadTo' => 'avatars',
+        'maxSize' => 2048,
+        'compress' => 90,
+        'resize' => [500 => 500]
+    ]);
 }
 ```
 
 Utilities:
 
-- `uploader()`
+- `Storage::disk('public')->uploader(compress: 90)->upload('avatar')`
+- `Uploader::make(compress: 90, ...)->upload('avatar')`
+- `uploader()->...`
 - `Spark\Utils\File` for static local filesystem operations, or `fm()` returning a `File` instance
 - `image()`
 

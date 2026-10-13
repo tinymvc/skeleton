@@ -46,7 +46,8 @@ Use a conditional layout; the adapter does not extract fragments:
     @extends('layouts/app')
 @endif
 
-@section('title')About@endsection
+@section('title', 'About')
+
 @section('content')
 <div>
     <h1>{{ $message }}</h1>
@@ -99,6 +100,8 @@ Normal `Request::validate()` failures are converted by FireMiddleware when insid
 
 The adapter replaces removed core APIs with `fire()` / `is_fire_js()` / `Route::fire()`. Do not recreate the old `fireline()` helper or `X-Fireline-Agent` protocol. For complete version-specific options, inspect the installed JS README and `vendor/tinymvc/fireline-php/README.md`, `src/FireService.php`, `src/FireMiddleware.php`, and `src/FireServiceProvider.php`.
 
+*FireLine Official documentation* `https://github.com/tinymvc/fireline-php/blob/main/README.md` and `https://github.com/shahinmoyshan/fireline/blob/main/README.md`.
+
 ## Inertia setup and API boundaries
 
 Install `tinymvc/inertia-php` only for an Inertia task. Read its installed README and Composer requirements before selecting compatible `@inertiajs/react` or `@inertiajs/vue3`, framework dependencies, and Vite plugin. Do not infer the Inertia major from TinyCore's version or copy a React entry into a Vue app.
@@ -120,6 +123,8 @@ Here `Post` is an imported application model. Component names must resolve in th
 Inspect installed support/signatures for `share`, closures, `optional`, `defer`, `always`, `merge`, `deepMerge`, `once`, `shareOnce`, and `scroll` before using them. They are version-specific; `lazy()` is not interchangeable with v3 `optional()`. Avoid eagerly evaluating an expensive query before wrapping its result in a deferred prop.
 
 For form writes, validate/authorize server-side and return the adapter's redirect to a GET page. Preserve session/CSRF and `X-Inertia` headers so validation follows the adapter's redirect/error flow. Do not send FireLine envelopes or a plain JSON success response to an Inertia visit. Verify `redirect`, `back`, `location`, flash, and asset-version behavior against the installed adapter; do not guess Laravel APIs. SSR requires explicit package support, not just a Vite server bundle.
+
+*Inertia Php documentation* `https://github.com/tinymvc/inertia-php/blob/main/README.md` 
 
 ## Verification and diagnosis
 
