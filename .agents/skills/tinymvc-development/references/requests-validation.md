@@ -114,7 +114,7 @@ public function index(\Spark\Http\Request $request): \Spark\Http\Resources\Resou
     $query = Post::query()
         ->when(
             $validated->has('q'),
-            fn($query) => $query->whereLike('title', "%{$search}%");
+            fn($query) => $query->where('title', 'LIKE', "%{$search}%");
         );
 
     return PostResource::collection($query->latest()->paginate(20));
