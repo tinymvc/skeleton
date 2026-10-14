@@ -27,6 +27,7 @@ return [
             'public' => ['root' => "$storage/app/public"],
         ],
     ],
+    'mail' => ['transport' => 'log'],
     'cache' => [
         'default' => 'file',
         'connections' => ['file' => ['path' => "$storage/cache", 'lock_path' => "$storage/locks"]],
