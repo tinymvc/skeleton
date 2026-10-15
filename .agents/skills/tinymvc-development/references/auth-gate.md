@@ -4,17 +4,25 @@ Read this reference for auth and authorization. Source paths and command working
 
 ## Auth and Authorization
 
-Auth helper:
+Auth Facade & Helpers:
 
 ```php
-auth()->attempt(['email' => $email, 'password' => $password], remember: true);
-auth()->login($user, remember: true);
-auth()->logout();
-auth()->check();
-auth()->isGuest();
-auth()->isLogged();
-auth()->user();
-auth()->id();
+use Spark\Facades\Auth;
+
+// Attempt login with credentials
+if (Auth::attempt(['email' => $email, 'password' => $password], remember: true)) {
+    $user = Auth::user(); // Returns authenticated Model instance
+}
+
+// State checks
+Auth::check();    // True if signed in
+Auth::isGuest();  // True if unauthenticated
+Auth::id();       // Primary key ID of authenticated user
+Auth::user();     // Authenticated User model instance
+
+// Manual login & logout
+Auth::login($user, remember: true);
+Auth::logout();
 ```
 
 Named guards are separate Auth singletons. In 4.0, `config/auth.php` defines the default `guard`, shared `model`, and `guards` map; configured named guards resolve lazily. The skeleton API guard uses JWT only. Alternatively, register a guard in a provider before use:
@@ -76,22 +84,30 @@ revocations apply to fresh request authentication, not an already-loaded identit
 
 `Spark\Foundation\Http\Middlewares\AuthMiddleware` is namespaced and accepts any matching guard, including negated names such as `auth:!admin`. Extend it and override `failed(Request $request, array $guards)` for custom failure responses; the default aborts with 401. Register its alias in `bootstrap/middlewares.php`. Guard matching does not switch the default identity for downstream code.
 
-Gate:
+Gate Facade & Ability Checks:
 
 ```php
-gate()->define('update-post', function ($post) {
-    $user = auth()->user();
-    return $user !== null && (string) $post->user_id === (string) $user->id;
-});
+use Spark\Facades\Gate;
+use Spark\Facades\Auth;
+use App\Models\Post;
 
-if (can('update-post', $post)) {
-    // allowed
+// Define authorization ability
+Gate::define('update-post', fn (Post $post) => Auth::check() && (int) $post->user_id === (int) Auth::id());
+
+// Check ability
+if (Gate::allows('update-post', $post)) {
+    // User is authorized
 }
 
-authorize('update-post', $post); // throws AuthorizationException on deny
+if (Gate::denies('update-post', $post)) {
+    // User is not authorized
+}
+
+// Authorize or abort with 403
+Gate::authorize('update-post', $post); // Throws Spark\Exceptions\Http\AuthorizationException (HTTP 403)
 ```
 
-`AuthorizationException` is mapped to HTTP 403. Gate forwards only the supplied arguments; it does not automatically inject the authenticated user. Read `auth()->user()` in the callback or pass the user explicitly.
+`AuthorizationException` is mapped to HTTP 403. Gate forwards only the supplied arguments; it does not automatically inject the authenticated user. Read `Auth::user()` in the callback or pass the user explicitly.
 
 Current JWT methods are `makeToken($user, $payload)` (sign only) and `createToken(?Model $user = null, array $payload = [])` (explicit or current user, register when configured), replacing `getJwtToken()` / `createJwtToken()`. `tokens()` lists the user's registered tokens; `token()` exposes a verified bearer jti but does not replace authentication. `revokeToken($hash = null)` defaults to the current bearer identifier and remains owner-scoped.
 

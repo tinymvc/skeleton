@@ -4,17 +4,25 @@ Read this reference for files and uploads. Source paths and command working dire
 
 ## Files and Uploads
 
-Use `storage()` / `Spark\Facades\Storage` for storage that may be local, public, or S3-compatible. Configuration is in `config/storage.php`; `FILESYSTEM_DISK` chooses the default. The concrete class is `Spark\Storage\Storage`.
-
-`Spark\Facades\Storage::disk('s3')` and `Spark\Storage\Storage::disk('s3')` both construct a named storage, as does `storage('s3')`. Selection does not change the default. Use the facade for static instance operations such as `Storage::put(...)`; with the concrete class use `Storage::disk('s3')->put(...)` or an injected instance.
+Use **`Spark\Facades\Storage`** for filesystem storage that may be local, public, or S3-compatible. Configuration is in `config/storage.php`; `FILESYSTEM_DISK` chooses the default.
 
 ```php
-$storage = storage('public');
-$storage->put('reports/result.txt', 'Ready');
-$contents = $storage->get('reports/result.txt');
-$path = $storage->uploader('avatars', extensions: ['jpg', 'png'], maxSize: 2048)
+use Spark\Facades\Storage;
+
+// Working with default disk
+Storage::put('reports/result.txt', 'Ready');
+$contents = Storage::get('reports/result.txt');
+$exists = Storage::exists('reports/result.txt');
+Storage::delete('reports/result.txt');
+
+// Working with specific disks (public, s3)
+Storage::disk('public')->put('avatars/user-1.jpg', $imageContent);
+$url = Storage::disk('public')->url('avatars/user-1.jpg');
+
+// Disk uploaders
+$path = Storage::disk('public')
+    ->uploader('avatars', extensions: ['jpg', 'png'], maxSize: 2048)
     ->upload($request->file('avatar'));
-$url = $storage->url($path);
 ```
 
 - `local` defaults to private `storage/app/private`; `public` uses `storage/app/public` and the existing `storage:link` mapping. Keys are relative paths, never URLs or absolute paths. Traversal is rejected; local child symlinks are not followed.
@@ -57,7 +65,6 @@ Inspect existing app usage before implementing uploads.
 
 `storage('s3')->storage()` exposes the underlying client (local disks return `LocalStorage`); it differs from the uploader `getDriver()`. Low-level `S3Storage::moveFile()` copies then deletes; `deleteDirectory($prefix)` deletes a paginated raw prefix and returns the count. It is not on the disk interface. An empty prefix is rejected; `reports/` scopes a directory while `reports` also matches `reports-old.csv`. Neither operation is atomic and versioned buckets can retain historical versions.
 
-### Dates
 
-Carbon `setTimezone()` preserves an instant; `shiftTimezone()` preserves wall-clock values while changing the instant. Both return a new value. `modify()` accepts a string or closure receiving the copied internal `DateTime`; mutate the argument, since its return value is ignored. ISO helpers are `toIsoString()` and `toIsoUtcString()`.
+
 

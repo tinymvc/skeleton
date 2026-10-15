@@ -39,9 +39,14 @@ $post = Post::findOrFail($id);             // Returns Post or throws 404 NotFoun
 $post = Post::where('slug', $slug)->first(); // First matching record or null
 $post = Post::where('slug', $slug)->firstOrFail();
 
-// Collections and Arrays
-$posts = Post::where('published', true)->get();      // Returns Spark\Support\Collection<Post>
-$postsArray = Post::where('published', true)->all(); // Returns array<Post>
+// Collections (Preferred) vs Raw Arrays
+$posts = Post::where('published', true)->latest()->get(); // Spark\Support\Collection<Post>
+$postsArray = Post::where('published', true)->all();       // plain PHP array<Post>
+
+// Rich Collection Operations
+$titles = $posts->pluck('title');
+$byAuthor = $posts->groupBy('author_id');
+$active = $posts->filter(fn (Post $p) => $p->is_active);
 
 // Ordering and Pagination
 $posts = Post::latest()->paginate(20);               // Order by created_at DESC, returns Paginator
@@ -52,6 +57,23 @@ $count = Post::where('published', true)->count();
 $exists = Post::where('slug', $slug)->exists();
 $missing = Post::where('slug', $slug)->doesntExist();
 $totalCredits = User::sum('credits');
+
+// Conditional Querying (when / unless)
+$posts = Post::query()
+    ->when($request->query('search'), function ($query, $search) {
+        $query->whereContains('title', $search);
+    })
+    ->when($request->query('category_id'), function ($query, $categoryId) {
+        $query->where('category_id', $categoryId);
+    })
+    ->latest()
+    ->paginate(20);
+
+// Grouped Boolean Logic with Closures
+$users = User::where(function ($query) {
+    $query->where('role', 'admin')
+          ->orWhere('role', 'manager');
+})->where('active', true)->get();
 ```
 
 ---
@@ -98,7 +120,7 @@ Common QueryBuilder / Model methods:
 - **Ordering**: `orderBy('id', 'DESC')`, `orderDesc('id')`, `orderAsc('name')`, `latest()`, `oldest()`, `random()`
 - **Limiting**: `take(10)`, `skip(20)`, `limit(offset: 0, limit: 10)`
 - **Terminal Execution**: `first()`, `firstOrFail()`, `get()`, `all()`, `paginate(limit: 20)`, `pluck('name', 'id')`, `value('title')`
-- **Mutations**: `insert([...])`, `update([...])`, `delete()`, `increment('views')`, `decrement('stock')`, `upsert(...)`
+- **Mutations & Writes**: `create([...])`, `firstOrCreate([...], [...])`, `firstOrNew([...], [...])`, `createOrUpdate([...])`, `upsert(...)`, `update([...])`, `delete()`, `destroy($id)`, `increment('views')`, `decrement('stock')`
 
 ---
 

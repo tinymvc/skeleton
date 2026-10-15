@@ -46,10 +46,14 @@ class PostController extends Controller
 
     public function store(StorePostRequest $request): Response
     {
-        $input = $request->validated(); // Input implements ArrayAccess, Arrayable and tinycore/spark supports Arrayable
-        $input['user_id'] = $request->user('id');
+        $post = Post::create(
+            $request->validated()->merge([
+                'user_id' => $request->user('id'),
+            ])
+        );
 
-        $post = Post::create($input);
+        // Dispatch background notification job
+        SendPostPublishedMail::dispatch($post->id)->onQueue('emails');
 
         return PostResource::make($post)->response(201);
     }
@@ -93,7 +97,7 @@ Do not add a service merely to call `Post::create()` or `PostResource::make()`. 
 namespace App\Services;
 
 use App\Models\Post;
-use Spark\Http\Requests\Input;
+use Spark\Http\Input;
 use RuntimeException;
 use Spark\Facades\DB;
 
@@ -104,7 +108,7 @@ class PostService
         return DB::transaction(function () use ($post, $data): Post {
             $post->fill($data);
 
-            if (! $post->save()) {
+            if (!$post->save()) {
                 throw new RuntimeException('Unable to save the post.');
             }
 

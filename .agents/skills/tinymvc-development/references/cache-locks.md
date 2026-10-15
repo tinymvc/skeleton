@@ -55,19 +55,33 @@ Redis requires `ext-redis`; it also accepts `socket`, `timeout`, `read_timeout`,
 ### Store and retrieve
 
 ```php
-$cache = cache('catalog');
-$cache->store('featured', $products, '+10 minutes');
-$products = $cache->retrieve('featured');
+use Spark\Facades\Cache;
+
+// Using default store via Facade
+Cache::store('featured_products', $products, '+10 minutes');
+$products = Cache::retrieve('featured_products');
+
+// Checking existence
+if (Cache::has('featured_products')) {
+    // ...
+}
+
+// Named store
+$catalogCache = Cache::make('catalog'); // cache('catalog')
+$catalogCache->store('featured', $products, '+10 minutes');
 ```
 
 Expiration is a date/time string accepted by the cache implementation; prefer explicit relative forms such as `+10 minutes`. A null expiration stores without a configured expiry. `has($key, eraseExpired: true)` and `retrieve($key, eraseExpired: true)` can remove expired entries while checking.
 
-### Compute a missing value
+### Compute a missing value (remember)
 
 ```php
-$products = cache('catalog')->remember(
-    'featured',
-    fn () => Product::where('featured', true)->take(12)->all(),
+use Spark\Facades\Cache;
+use App\Models\Product;
+
+$products = Cache::remember(
+    'featured_products',
+    fn () => Product::where('featured', true)->latest()->take(12)->get(),
     '+10 minutes',
 );
 ```

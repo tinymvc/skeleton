@@ -39,13 +39,13 @@ Apply the column migration before enabling the model. A rollback uses `$table->d
 ### Select, archive, restore, and purge
 
 ```php
-$active = Post::orderDesc('id')->all();
-$trash = Post::onlyTrashed()->orderDesc('id')->paginate(20);
-$all = Post::withTrashed()->all();
-$activeAgain = Post::withTrashed(false)->all();
+$active = Post::latest()->get();
+$trash = Post::onlyTrashed()->latest()->paginate(20);
+$all = Post::withTrashed()->latest()->get();
+$activeAgain = Post::withoutTrashed()->get();
 
 $post = Post::findOrFail($id);
-$post->remove();
+$post->remove(); // Soft deletes the instance
 $archived = Post::onlyTrashed()->findOrFail($id);
 $isArchived = $archived->trashed();
 $restored = $archived->restore();

@@ -74,10 +74,36 @@ class Post extends Model
   - Disable with `protected const USE_TIMESTAMPS = false;`.
 
 ### Model Actions & Lifecycle
-- **Creation**: `Post::create($validated)` returns a newly persisted, hydrated `Post` instance. Pass an array or `Spark\Http\Input` deliberately.
+- **Creation**: `Post::create($validated)` returns a newly persisted, hydrated `Post` instance.
+- **First or Create**: `Post::firstOrCreate(['slug' => $slug], ['title' => $title])` finds matching record or creates it.
+- **First or New**: `Post::firstOrNew(['slug' => $slug], ['title' => $title])` finds matching record or returns an unpersisted instance.
+- **Create or Update**: `Post::createOrUpdate($data, uniqueBy: ['email'], values: ['name' => $name])`.
 - **Filling**: `$post->fill($validated)` populates fillable attributes in memory.
 - **Saving**: `$post->save()` persists changes and returns a `bool`.
-- **Deleting an Instance**: `$post->remove()` deletes a loaded model instance and returns `bool`. Query-builder `delete()` returns an affected-row count and has different lifecycle behavior.
+- **Deleting an Instance**: `$post->remove()` deletes a loaded model instance and returns `bool`.
+- **Destroy by ID**: `Post::destroy($id)` or `Post::destroy([1, 2, 3])` deletes by primary key(s).
+
+### Native Model Events
+
+Override `protected function events(): Events` on your model using `Spark\Database\Events`:
+
+```php
+use Spark\Database\Events;
+use App\Jobs\SendAccountMail;
+use Spark\Facades\Cache;
+use Spark\Facades\Storage;
+
+protected function events(): Events
+{
+    return Events::make(
+        created: fn() => SendAccountMail::dispatch($this->id)->onQueue('emails'),
+        updated: fn() => Cache::erase("user:{$this->id}"),
+        deleted: fn() => Storage::disk('public')->delete($this->avatar_path),
+    );
+}
+```
+
+Hooks execute automatically on `save()` and `remove()`. `changed` fires whenever `created`, `updated`, or `deleted` triggers.
 
 ---
 
@@ -161,13 +187,23 @@ $posts = Post::query()
 ### 3. Many-to-Many Pivot Operations
 
 ```php
-// Attach tags
+// Attach related records
 $post->tags()->attach([1, 2]);
+$post->tags()->attach(1, ['expires_at' => now()->addDays(30)]);
 
-// Sync tags (removes unlisted, attaches new)
+// Sync relations (detaches unlisted, attaches new)
 $post->tags()->sync([2, 3]);
 
-// Detach all or specific tags
+// Sync without detaching existing associations
+$post->tags()->syncWithoutDetaching([4, 5]);
+
+// Toggle association state (attaches if absent, detaches if present)
+$post->tags()->toggle([1, 2]);
+
+// Update attributes on a specific pivot record
+$post->tags()->updateExistingPivot(1, ['active' => true]);
+
+// Detach all or specific associations
 $post->tags()->detach([1]);
 $post->tags()->detach(); // Detaches all
 ```
@@ -182,8 +218,23 @@ Supported `$casts`:
 - `float` / `double` / `decimal:2`
 - `string`
 - `array` / `json`
+- `collection` -> Automatically wraps attribute as `Spark\Support\Collection`
 - `date`, `datetime`, `timestamp` -> Automatically converted to `Spark\Carbon`
-- `hashed` / `encrypted`
+- `hashed` (auto-hashes passwords on store)
+- `encrypted` (auto-encrypts on store, decrypts on access)
+
+Custom Casts via `Attribute`:
+```php
+use Spark\Database\Casts\Attribute;
+
+protected function name(): Attribute
+{
+    return Attribute::make(
+        get: fn (string $value) => ucfirst($value),
+        set: fn (string $value) => strtolower($value),
+    );
+}
+```
 
 > [!IMPORTANT]
 > Because date attributes and timestamps are cast to `Spark\Carbon`, `JsonResource::normalize()` automatically serializes them to ISO-8601 UTC strings (`toIsoUtcString()`). Never call `Carbon::parse()` on model date attributes in resources.

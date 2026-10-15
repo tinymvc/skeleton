@@ -33,7 +33,7 @@ Prefer these choices:
 - Controllers: return `JsonResource`/`ResourceCollection` for JSON entities and lists, `json()` for intentional message/scalar contracts, and `view()`/redirects for browser responses.
 - Validation: use `Spark\Foundation\Http\FormRequest` for meaningful writes and authorization; reserve `$request->validate()` for small filters or trivial actions.
 - Database: use `Spark\Database\Model` static queries, scopes, and relations for domain tables; use `query($table)` only for unmodeled/framework or deliberately low-level work.
-- Background work: use class jobs with `Spark\Queue\Dispatchable`; use `dispatchOnce()` for recurring scheduler/cron jobs.
+- Background work: always dispatch application jobs statically via `Spark\Queue\Dispatchable`: `JobClass::dispatch(...)->onQueue(...)`. Never write procedural `job(JobClass::class, ...)->dispatch(...)` in application code. Use `dispatchOnce()` for recurring jobs.
 - Paths: use config and helpers such as `storage_dir()`, `root_dir()`, `upload_dir()`, and `views_dir()`.
 - Framework uncertainty: inspect the matching source file under `./vendor/tinymvc/tinycore/src/` before guessing Laravel behavior.
 

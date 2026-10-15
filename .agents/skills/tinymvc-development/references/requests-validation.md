@@ -104,7 +104,12 @@ public function store(StorePostRequest $request): Response
 Reserve inline `$request->validate([...])` **only** for lightweight search filters or simple single-field endpoints where a dedicated FormRequest would be excessive:
 
 ```php
-public function index(\Spark\Http\Request $request): \Spark\Http\Resources\ResourceCollection
+use App\Http\Resources\PostResource;
+use App\Models\Post;
+use Spark\Http\Request;
+use Spark\Http\Resources\ResourceCollection;
+
+public function index(Request $request): ResourceCollection
 {
     $validated = $request->validate([
         'q' => 'nullable|string|max:100',
@@ -112,10 +117,12 @@ public function index(\Spark\Http\Request $request): \Spark\Http\Resources\Resou
     ]);
 
     $query = Post::query()
-        ->when(
-            $validated->has('q'),
-            fn($query) => $query->where('title', 'LIKE', "%{$search}%");
-        );
+        ->when($validated->has('q'), function ($query) use ($validated) {
+            $query->whereContains('title', $validated->get('q'));
+        })
+        ->when($validated->has('status'), function ($query) use ($validated) {
+            $query->where('status', $validated->get('status'));
+        });
 
     return PostResource::collection($query->latest()->paginate(20));
 }

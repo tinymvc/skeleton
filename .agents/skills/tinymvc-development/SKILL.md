@@ -45,17 +45,68 @@ Do not use `DB::table('posts')` or `query('posts')` as a model substitute: it by
 
 Remember the installed return contracts: `create()` and `fill()` return a model; `save()` and `remove()` return `bool`; query `update()` and `delete()` return affected-row counts. A loaded model is deleted with `$model->remove()`. Check these results when failure matters instead of importing an Eloquent assumption.
 
-### 4. Keep controllers thin and services purposeful
+### 4. Always dispatch jobs statically via `Dispatchable`
+
+Application jobs implement `Spark\Queue\Contracts\JobInterface` and use `Spark\Queue\Dispatchable`. In controllers, models, and services, **always use the static dispatch methods**:
+
+```php
+// Dispatch to a queue
+SendAccountMail::dispatch($user->id)->onQueue('emails');
+
+// Dispatch with delay
+SendAccountMail::dispatch($user->id)->onQueue('emails')->delay(60);
+
+// Dispatch with deduplication (push once)
+SyncReports::dispatchOnce()->onQueue('reports')->repeatEveryMinutes(5);
+
+// Conditional dispatch
+SendAccountMail::dispatchIf($user->is_active, $user->id);
+SendAccountMail::dispatchUnless($user->is_banned, $user->id);
+
+// Synchronous dispatch
+ProcessPayment::dispatchSync($order->id);
+```
+
+**Never use `job(JobClass::class, [...])->dispatch(...)` or procedural `dispatch(...)`** in application domain logic. The `job()` helper is reserved strictly for recurring queue registration in `bootstrap/app.php` (`withQueue(jobs: [...])`) or raw callbacks like job([SomeClass::class, 'method'])->dispatch() or dispatch(...some_callable...).
+
+### 5. Use native facades and fluent utilities
+
+TinyCore provides first-class static facades under `Spark\Facades\*`. Write modern, expressive code:
+- **Mail**: `Mail::to($user->email, $user->name)->subject('Welcome')->view('emails.welcome', ['user' => $user])->send();`
+- **HTTP Client**: `$response = Http::withToken($token)->post('https://api.example.com/data', $payload);` check with `$response->successful()` and `$response->json('data.id')`.
+- **Storage**: `Storage::disk('public')->put('path/file.txt', $data);` or `Storage::url($path)`.
+- **Cache**: `Cache::remember('key', fn() => ..., '+1 hour');`, `Cache::store(...)`, `Cache::erase(...)`.
+- **Auth & Gate**: `Auth::check()`, `Auth::user()`, `Auth::attempt(...)`; `Gate::define(...)`, `Gate::authorize(...)`.
+- **Database**: `DB::transaction(fn() => ...);`.
+- **Support Helpers**: `collect($items)`, `str($value)->slug()`, `Str::uuid()`, `Arr::get($data, 'key')`, `tap($model, fn($m) => ...)`, `throw_if($condition, DomainException::class, 'message')`.
+
+### 6. Collection-first queries, pivot relations, and model events
+
+- **Collection-First**: Default query execution should use `->get()` (which returns a `Spark\Support\Collection`) or `->paginate($limit)` rather than `->all()` (which returns a raw PHP array). Collections provide higher-order operations: `map()`, `filter()`, `pluck()`, `keyBy()`, `first()`.
+- **Pivot Relations**: Manage `belongsToMany` pivots using native methods: `$model->tags()->attach([1, 2])`, `$model->tags()->detach([1])`, `$model->tags()->sync([2, 3])`, `$model->tags()->toggle([1])`.
+- **Model Events**: Register model lifecycle reactions via `protected function events(): Events`:
+  ```php
+  protected function events(): Events
+  {
+      return Events::make(
+          created: fn() => SendAccountMail::dispatch($this->id)->onQueue('emails'),
+          updated: fn() => Cache::erase("user:{$this->id}"),
+          deleted: fn() => Storage::delete($this->avatar_path),
+      );
+  }
+  ```
+
+### 7. Keep controllers thin and services purposeful
 
 Controllers coordinate route/request/model/service/response work. Keep query composition close to models as scopes and relations. Put multi-step domain workflows, transactions, external effects, cache invalidation, file operations, or reusable business rules in focused `app/Services/*Service` classes. Do not create repositories, service layers, DTOs, or pipelines for a one-line operation; do create a service when it gives a stable responsibility and a testable boundary.
 
 Prefer constructor or action injection through the Spark container. Do not capture a current request, user, tenant, PDO connection, or open transaction in a singleton or queued job. Use jobs for durable work, `defer()` only for small process-local post-response work, `Spark\Concurrency` for independent bounded tasks, and `Spark\Console\Process` for bounded subprocesses.
 
-### 5. Use route model binding when the contract fits
+### 8. Use route model binding when the contract fits
 
 Define `{post}` or `{post:slug}` and type-hint `Post $post` in the action. Spark resolves the model with `firstOrFail()` before invocation. Keep parameter names aligned. Use an explicit query/service when lookup needs ownership, compound conditions, trash visibility, or a non-model result; binding alone never proves authorization.
 
-### 6. Follow the local style
+### 9. Follow the local style
 
 - Four spaces, no tabs; class and method braces on the next line; braces for all control flow.
 - One statement per line, descriptive names, explicit visibility and types where the real contract permits.
@@ -104,10 +155,12 @@ Run `php -l` on changed PHP files and the focused native tests (`php test --filt
 
 Before handing off, inspect the diff for:
 
+- application jobs dispatched statically via `JobClass::dispatch()` and never `job(JobClass::class, ...)->dispatch(...)`;
 - resource controllers using `JsonResource` for entities/collections and `json()` only for intentional non-resource contracts;
 - FormRequests on substantial state-changing workflows;
-- model-first queries and native relations where a model exists;
+- model-first queries with `->get()` (Collections) and native relations where a model exists;
 - no `Carbon::parse($model->created_at)` or manual `toIsoUtcString()` inside resources;
+- proper facade usage (`Mail`, `Http`, `Storage`, `Cache`, `DB`, `Auth`, `Gate`) rather than procedural helper sprawl;
 - no accidental `$model->delete()`, wrong `App\Http\Controller`/`Spark\Http\Requests\Input` imports, invented Laravel APIs, or duplicated Spark behavior;
 - tests and docs matching the installed TinyCore version and the target app's actual frontend.
 
