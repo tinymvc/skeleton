@@ -7,7 +7,7 @@ Read this reference for auth and authorization. Source paths and command working
 Auth helper:
 
 ```php
-auth()->attempt(['email' => $email, 'password' => $password]);
+auth()->attempt(['email' => $email, 'password' => $password], remember: true);
 auth()->login($user, remember: true);
 auth()->logout();
 auth()->check();
