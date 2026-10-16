@@ -172,8 +172,10 @@ Templates also have application context such as `$app`, `$request`, `$session`, 
 ## Custom directives and template paths
 
 ```php
-blade()->directive('year', function ($expression) {
-    return '<?php echo date("Y"); ?>';
+use Spark\Facades\Blade;
+
+Blade::directive('year', function ($expression) {
+    return '<?php echo now()->year; ?>';
 });
 ```
 

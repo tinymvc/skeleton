@@ -1,81 +1,56 @@
-# Sessions and cookies
+# Sessions and Cookies
 
-Read for browser state, login/logout, cookies, and handler changes. Inspect `Http/Session.php`, `Http/Session/`, and the application’s `config/session.php` in the installed package.
+Read this reference for web session state, cookies, flash messages, and session storage handlers. All source paths refer to the application root.
 
-## Configure session storage
+---
 
-Spark 4.0 adds `config/session.php` with `handler` set to `database`, `file`, or `redis`. The skeleton defaults to `database` (`SESSION_HANDLER`); run the framework migration before serving web requests.
+## Session Management with `Spark\Facades\Session`
 
-| Handler | Connection settings | Storage |
-| --- | --- | --- |
-| `database` | `connection`, `table` (default `sessions`) | `id`, base64 `payload`, `last_activity` |
-| `file` | `path` | `storage/framework/sessions` |
-| `redis` | Shared Redis connector options | Application-prefixed keys with TTL |
-
-`lifetime` is idle lifetime in **minutes**, default 120. Every write refreshes it. Expired data is rejected on read; file/database garbage collection removes old records, while Redis TTL handles expiry. `expire_on_close` controls browser cookie lifetime without disabling server expiry.
-
-`cookie_name` defaults to `spark_session`. `cookie_settings` accepts `path`, `domain`, `secure`, `http_only`, and `same_site`. A null `secure` detects direct HTTPS; when TLS terminates at a proxy, explicitly set `SESSION_COOKIE_SECURE=true` in production. Strict session-ID validation rejects unknown client-supplied IDs. Configure `gc_probability` and `gc_divisor` for PHP's garbage-collection lottery.
-
-The file handler holds an exclusive lock from read until close, serializing requests for the same session ID. Database and Redis handlers use atomic writes but do not hold a request-long session lock: concurrent requests can overwrite changes. Close sessions promptly, or explicitly serialize application operations that must update session state together. File sessions require a local filesystem.
-
-## Read and write state
-
-The Session service starts a PHP session during normal web use. `session()` returns the service; an array sets values and a string reads one value:
+TinyCore provides the **`Spark\Facades\Session`** facade as well as the global `session()` helper:
 
 ```php
+use Spark\Facades\Session;
+
+// 1. Reading Session Values
+$theme = Session::get('theme', default: 'light');
+$cartCount = session('cart_count', 0);
+
+// 2. Writing Session Values
+Session::put('theme', 'dark');
+Session::set('locale', 'en');
 session(['cart_count' => 3]);
-$count = session('cart_count', 0);
-session()->set('locale', 'en');
+
+// 3. Checking Existence
+if (Session::has('user_id')) {
+    // Key exists and is not null
+}
+
+// 4. Removing Values
+Session::forget('cart_count');
+$token = Session::pull('csrf_token'); // Reads and immediately deletes
+Session::flush(); // Clears all session data
+
+// 5. Flash Messages (available until retrieved)
+Session::flash('status', 'Your profile was updated successfully!');
+$status = Session::getFlash('status'); // Retrieves and clears
 ```
 
-The second argument of `session('key', $default)` is a **read default**, not a value to write. Use `session(['key' => $value])` or `set()` / `put()` for writes.
+---
 
-## Common operations
+## Cookies with `now()`
 
-| Method | Action |
-| --- | --- |
-| `get($key, $default)` | Read a value |
-| `set($key, $value)`, `put($key, $value)` | Store a value |
-| `put($array)` | Store several values |
-| `has($key)` | Check a non-null value exists |
-| `delete($key)`, `forget($keys)` | Remove values |
-| `pull($key, $default)` | Read and remove a value |
-| `all()` | Read session data |
-| `flush()` | Clear data |
-| `id()` | Current session ID |
-| `close()` | Finish writing the PHP session |
-
-The methods are also available on `Spark\Http\Session`. Normal CLI execution does not start browser sessions; the testing environment supplies isolated session behavior.
-
-## Flash messages
+Use the `cookie()` helper for managing HTTP cookies:
 
 ```php
-session()->flash('success', 'Your profile was saved.');
-return redirect('/profile');
-```
+// Read a cookie
+$displayMode = cookie('display_mode');
 
-Read with `getFlash('success')`; `hasFlash()` checks availability and `clearFlash()` removes flash state. Reading `getFlash()` removes the value immediately. Unread values remain until retrieved or cleared; this implementation does not automatically age every flash key out after one request. Read a message once and pass it to the view if several components need it.
+// Set a simple cookie (name, value, minutes)
+cookie('display_mode', 'compact', 60 * 24 * 30);
 
-Response helpers `with()`, `withErrors()`, and `withInput()` integrate with this state. Keep old input limited to safe fields.
-
-## Regeneration and logout
-
-`regenerate($deleteOldSession)` changes the session ID. Regenerate after a successful login or privilege change to avoid carrying an old session identifier into the authenticated state. `invalidate()` clears state and regenerates; `destroy()` ends the session.
-
-Use the Auth service's `logout()` before invalidating when ending a login, so remembered-authentication state is handled as well.
-
-## Cookies
-
-```php
-$preference = cookie('display_mode');
-cookie('display_mode', 'compact', 60 * 60 * 24 * 30);
-```
-
-A null value reads the cookie. An integer third argument is a relative lifetime in seconds; zero creates a session cookie and a negative value expires it. An options array follows PHP's `setcookie` shape:
-
-```php
+// Set a cookie with options array (using now()->addDays(...) for expiration timestamp)
 cookie('display_mode', 'compact', [
-    'expires' => time() + 86400,
+    'expires' => now()->addDays(30)->timestamp,
     'path' => '/',
     'secure' => true,
     'httponly' => true,
@@ -83,8 +58,22 @@ cookie('display_mode', 'compact', [
 ]);
 ```
 
-With an options array, `expires` is an absolute Unix timestamp. The helper defaults to HttpOnly and SameSite Lax, but `secure` defaults to false; set the intended HTTPS behavior explicitly. Cookies are client input and should not be treated as trusted authorization data.
+> [!IMPORTANT]
+> **Use `now()` for Cookie Expiration**:
+> Never use `time() + 86400`. Always write `now()->addDay()->timestamp` or `now()->addDays(30)->timestamp`.
 
-## Operational notes
+---
 
-Send session/cookie changes before output reaches the browser. Configure PHP session storage and cookie settings for your deployment; multiple servers need compatible shared session storage or a deliberate routing policy. See [CSRF & CORS](middleware.md) for session-backed request protection.
+## Session Configuration
+
+Spark supports `database`, `file`, and `redis` session handlers in `config/session.php`:
+
+| Handler | Connection settings | Storage |
+| --- | --- | --- |
+| `database` | `connection`, `table` (default `sessions`) | `id`, base64 `payload`, `last_activity` |
+| `file` | `path` | `storage/framework/sessions` |
+| `redis` | Shared Redis connector options | Application-prefixed keys with TTL |
+
+- **`lifetime`**: Session idle lifetime in **minutes** (default 120).
+- **Regeneration**: Call `Session::regenerate()` after login to prevent session fixation.
+- **Invalidation**: Call `Session::invalidate()` on logout to flush data and change session ID.

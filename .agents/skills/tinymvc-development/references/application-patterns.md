@@ -136,7 +136,7 @@ class PostService
 }
 ```
 
-Pass arrays or `Spark\Http\Input` deliberately. Convert `validated()` to `all()` at the controller boundary when the service contract is an array. Keep authorization outside the service when it is request-specific, or pass an explicit actor when the rule belongs in the domain workflow.
+Pass `Spark\Http\Input` or arrays deliberately. Since `Spark\Http\Input` implements `\Spark\Contracts\Support\Arrayable` and `\ArrayAccess`, it passes seamlessly into `$post->fill($data)` or `Post::create($data)` without requiring explicit `->all()` or `->toArray()` conversion. Keep authorization outside the service when it is request-specific, or pass an explicit actor when the rule belongs in the domain workflow.
 
 ## Model scopes, casts, and relations
 

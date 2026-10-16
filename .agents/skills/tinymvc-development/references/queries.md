@@ -2,6 +2,8 @@
 
 Read this reference for database queries, model queries, transactions, and locks. All source paths and commands are relative to the application root.
 
+---
+
 ## Model-First Query Architecture
 
 > [!IMPORTANT]
@@ -30,15 +32,11 @@ Use raw query builders **only** for:
 
 ---
 
-## Model Querying
+## Collection-First Querying
+
+Always prefer `->get()` (which returns a `Spark\Support\Collection`) or `->paginate($limit)` (which returns a `Spark\Utils\Paginator`) over `->all()` (which returns a raw array):
 
 ```php
-// Finding records
-$post = Post::find($id);                     // Returns Post|null
-$post = Post::findOrFail($id);             // Returns Post or throws 404 NotFoundException
-$post = Post::where('slug', $slug)->first(); // First matching record or null
-$post = Post::where('slug', $slug)->firstOrFail();
-
 // Collections (Preferred) vs Raw Arrays
 $posts = Post::where('published', true)->latest()->get(); // Spark\Support\Collection<Post>
 $postsArray = Post::where('published', true)->all();       // plain PHP array<Post>
@@ -47,16 +45,77 @@ $postsArray = Post::where('published', true)->all();       // plain PHP array<Po
 $titles = $posts->pluck('title');
 $byAuthor = $posts->groupBy('author_id');
 $active = $posts->filter(fn (Post $p) => $p->is_active);
+$keyed = $posts->keyBy('id');
+```
+
+---
+
+## Arrayable Support in Queries
+
+Both `QueryBuilder` and `Model` query scopes accept `Arrayable` (including `Spark\Http\Input` and `Spark\Support\Collection`) in conditions and writes:
+
+```php
+// 1. Arrayable in WHERE conditions (converts to multiple equality checks):
+$matchingPosts = Post::where(
+    $request->validated()->only('category_id', 'status')
+)->get();
+
+// 2. Arrayable in UPDATE queries:
+Post::whereKey($id)->update($request->validated());
+
+// 3. Arrayable in INSERT queries:
+DB::table('audit_logs')->insert(
+    $request->validated()->merge(['created_at' => now()])
+);
+```
+
+---
+
+## Finding Records & Common Conditions
+
+```php
+// Finding records
+$post = Post::find($id);                     // Returns Post|null
+$post = Post::findOrFail($id);             // Returns Post or throws 404 NotFoundException
+$post = Post::where('slug', $slug)->first(); // First matching record or null
+$post = Post::where('slug', $slug)->firstOrFail();
 
 // Ordering and Pagination
 $posts = Post::latest()->paginate(20);               // Order by created_at DESC, returns Paginator
-$oldest = Post::oldest()->first();                   // Order by created_at ASC
+$postsByDate = Post::latest('published_at')->get();  // Order by custom column DESC
+$oldest = Post::oldest('created_at')->first();       // Order by created_at ASC
+
+// Scalar Values and Pluck
+$email = User::where('id', $id)->value('email');     // Returns single scalar string|int|null
+$roleMap = User::pluck('name', 'id');                // Returns array [id => name, ...]
+$tagNames = Tag::pluck('name');                      // Returns array ['php', 'spark', ...]
 
 // Aggregates & Existence
 $count = Post::where('published', true)->count();
 $exists = Post::where('slug', $slug)->exists();
 $missing = Post::where('slug', $slug)->doesntExist();
 $totalCredits = User::sum('credits');
+
+// Advanced Where Clauses
+$adults = User::whereBetween('age', [18, 65])->get();
+$unverified = User::whereNull('email_verified_at')->get();
+$verified = User::whereNotNull('email_verified_at')->get();
+$recentlyModified = User::whereColumn('updated_at', '>', 'created_at')->get();
+$sameNames = User::whereColumn('first_name', 'last_name')->get(); // Operator defaults to '='
+$darkModeUsers = User::whereJsonContains('preferences', 'theme', 'dark')->get();
+
+// Subqueries and Existence Checks
+$activeCustomers = User::whereExists(function ($query) {
+    $query->table('orders')->whereColumn('orders.user_id', 'users.id');
+})->get();
+
+$usersWithLastOrder = User::select('id', 'name')
+    ->selectSub(function ($query) {
+        $query->table('orders')
+            ->selectRaw('MAX(created_at)')
+            ->whereColumn('orders.user_id', 'users.id');
+    }, 'last_order_at')
+    ->get();
 
 // Conditional Querying (when / unless)
 $posts = Post::query()
@@ -78,31 +137,20 @@ $users = User::where(function ($query) {
 
 ---
 
-## Native ORM Relations vs Raw Joins
+## Date and Time Conditions with `now()`
 
-> [!TIP]
-> **Prefer Native Relations over Manual `join()` or `whereRaw()`**:
-> TinyCore features a comprehensive ORM relationship engine. Avoid writing manual SQL joins or raw WHERE clauses when native relations can express the query:
+Use `now()`, `today()`, or `Spark\Carbon` directly in date conditions:
 
 ```php
-// BAD: Manual joins and where clauses
-$posts = DB::table('posts')
-    ->join('users', 'users.id', '=', 'posts.user_id')
-    ->where('users.role', 'admin')
-    ->select('posts.*')
-    ->all();
-
-// GOOD: Native Model relation querying
-$posts = Post::whereRelation('author', 'role', 'admin')->get();
-
-// GOOD: Filtering with relation closure
-$posts = Post::whereHas('comments', fn ($query) => $query->where('approved', true))->get();
-
-// GOOD: Eager loading and counts
-$posts = Post::with(['author', 'category'])
-    ->withCount('comments')
-    ->latest()
+// Compare against current timestamp
+$activeEvents = Event::where('starts_at', '<=', now())
+    ->where('ends_at', '>=', now())
     ->get();
+
+// Specific date parts
+$todayPosts = Post::whereDate('created_at', '=', today()->toDateString())->get();
+$currentYearPosts = Post::whereYear('created_at', '=', now()->year)->get();
+$currentMonthPosts = Post::whereMonth('created_at', '=', now()->month)->get();
 ```
 
 ---
@@ -111,20 +159,22 @@ $posts = Post::with(['author', 'category'])
 
 Common QueryBuilder / Model methods:
 
-- **Selection**: `select('id', 'title')`, `selectRaw('COUNT(*) as total')`, `distinct()`, `column('title')`
-- **Conditions**: `where('status', 'active')`, `orWhere('role', 'admin')`, `whereNull('deleted_at')`, `whereNotNull('published_at')`
-- **Lists & Ranges**: `whereIn('id', [1, 2, 3])`, `whereNotIn('status', ['archived'])`, `between('age', 18, 65)`
+- **Selection**: `select('id', 'title')`, `selectRaw('COUNT(*) as total')`, `selectSub($subquery, 'alias')`, `distinct()`, `column('title')`
+- **Conditions**: `where('status', 'active')`, `orWhere('role', 'admin')`, `whereNull('deleted_at')`, `whereNotNull('published_at')`, `whereColumn('updated_at', '>', 'created_at')`
+- **Lists & Ranges**: `whereIn('id', [1, 2, 3])`, `whereNotIn('status', ['archived'])`, `whereBetween('age', [18, 65])`, `whereNotBetween('score', [1, 5])`, `between('age', 18, 65)`
 - **Strings**: `whereContains('bio', 'engineer')`, `whereStartsWith('sku', 'SPARK-')`, `whereEndsWith('email', '@example.com')`, `like('name', '%John%')`
-- **Dates**: `whereDate('created_at', '=', '2026-10-11')`, `whereYear('created_at', '=', 2026)`, `whereMonth('created_at', '=', 10)`
+- **JSON**: `whereJsonContains('settings', 'theme', 'dark')`, `whereJsonNotContains('settings', 'beta', true)`
+- **Existence**: `whereExists(Closure $callback)`, `whereNotExists(Closure $callback)`, `exists()`, `doesntExist()`
+- **Dates**: `whereDate('created_at', '=', today()->toDateString())`, `whereYear('created_at', '=', now()->year)`, `whereMonth('created_at', '=', now()->month)`
 - **Relations**: `with()`, `withExists()`, `withCount()`, `withSum()`, `withAvg()`, `whereHas()`, `whereDoesntHave()`, `whereRelation()`
-- **Ordering**: `orderBy('id', 'DESC')`, `orderDesc('id')`, `orderAsc('name')`, `latest()`, `oldest()`, `random()`
+- **Ordering**: `orderBy('id', 'DESC')`, `orderDesc('id')`, `orderAsc('name')`, `latest('created_at')`, `oldest('created_at')`, `random()`
 - **Limiting**: `take(10)`, `skip(20)`, `limit(offset: 0, limit: 10)`
 - **Terminal Execution**: `first()`, `firstOrFail()`, `get()`, `all()`, `paginate(limit: 20)`, `pluck('name', 'id')`, `value('title')`
 - **Mutations & Writes**: `create([...])`, `firstOrCreate([...], [...])`, `firstOrNew([...], [...])`, `createOrUpdate([...])`, `upsert(...)`, `update([...])`, `delete()`, `destroy($id)`, `increment('views')`, `decrement('stock')`
 
 ---
 
-## Upserts and Writes
+## Upserts and Mass Writes
 
 ```php
 Product::upsert(
@@ -137,7 +187,7 @@ Product::upsert(
 );
 ```
 
-- Signature: `upsert($data, ?array $conflict = null, ?array $update = null)`.
+- Signature: `upsert(array|Arrayable $data, ?array $conflict = null, ?array $update = null)`.
 - `conflict` specifies the unique constraint columns (defaults to `['id']`).
 - `update` specifies the columns to update on conflict (omitted/null updates all non-conflict columns).
 
@@ -147,37 +197,39 @@ Product::upsert(
 
 Use `Spark\Facades\DB::transaction()` to execute multi-step database writes atomically:
 
-The example assumes `$userId` and `$items` came from a validated request; the total is calculated before opening the transaction.
-
 ```php
 use Spark\Facades\DB;
-use App\Models\User;
 use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
 
-$total = array_reduce(
-    $items,
-    static fn (float $sum, array $item): float => $sum + $item['total'],
-    0.0,
-);
+$order = DB::transaction(function () use ($userId, $items): Order {
+    $order = Order::create([
+        'user_id' => $userId,
+        'status' => 'pending',
+        'ordered_at' => now(),
+    ]);
 
-$order = DB::transaction(function () use ($userId, $items, $total): Order {
-    $user = User::whereKey($userId)->lockForUpdate()->firstOrFail();
+    foreach ($items as $item) {
+        // Lock product row for atomic inventory update
+        $product = Product::whereKey($item['product_id'])
+            ->lockForUpdate()
+            ->firstOrFail();
 
-    if ($user->balance < $total) {
-        abort(400, 'Insufficient balance.');
+        abort_if($product->stock < $item['quantity'], 422, 'Insufficient stock.');
+
+        $product->decrement('stock', $item['quantity']);
+
+        $order->items()->create([
+            'product_id' => $product->id,
+            'quantity' => $item['quantity'],
+            'unit_price' => $product->price,
+        ]);
     }
 
-    $user->decrement('balance', $total);
-
-    return Order::create([
-        'user_id' => $user->id,
-        'total' => $total,
-        'status' => 'completed',
-    ]);
+    return $order;
 });
 ```
 
-- If an exception is thrown inside the callback, the transaction is automatically rolled back and the exception rethrown.
 - `lockForUpdate()` requests an exclusive SELECT lock (`FOR UPDATE`).
-- `sharedLock()` requests a shared read lock (`LOCK IN SHARE MODE` / `FOR SHARE`).
-- Locks must always be run within an active transaction to prevent race conditions.
+- SQLite uses database-level locks rather than row-level locks; design transactions accordingly when targeting SQLite.

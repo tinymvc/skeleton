@@ -31,9 +31,11 @@ Prefer these choices:
 
 - Routes: use `Spark\Facades\Route` when the app imports it, otherwise use `router()`.
 - Controllers: return `JsonResource`/`ResourceCollection` for JSON entities and lists, `json()` for intentional message/scalar contracts, and `view()`/redirects for browser responses.
-- Validation: use `Spark\Foundation\Http\FormRequest` for meaningful writes and authorization; reserve `$request->validate()` for small filters or trivial actions.
-- Database: use `Spark\Database\Model` static queries, scopes, and relations for domain tables; use `query($table)` only for unmodeled/framework or deliberately low-level work.
+- Validation & Input: use `Spark\Foundation\Http\FormRequest` for meaningful writes and authorization. Remember that `Spark\Http\Input` returned by `$request->validated()` implements `Arrayable` and `ArrayAccess`. Pass it directly into `Model::create()`, `Model::createOrUpdate()`, `$model->fill()`, `QueryBuilder::update()`, and `Auth::attempt()` without calling `->all()` or `->toArray()`.
+- Dates & Times: **Never use legacy PHP date functions** (`gmdate()`, `date()`, `time()`, `strtotime()`). TinyCore configures application timezone (UTC) on boot. Always use `now()`, `carbon()`, `Spark\Carbon`, and Carbon formatting methods (`toDateTimeString()`, `toDateString()`, `toIsoUtcString()`, `timestamp`). Pass Carbon instances directly to resources and queries.
+- Database: use `Spark\Database\Model` static queries, scopes, and relations for domain tables; use `query($table)` only for unmodeled/framework or deliberately low-level work. Execute with `->get()` (Collections) and `->paginate()` rather than `->all()`.
 - Background work: always dispatch application jobs statically via `Spark\Queue\Dispatchable`: `JobClass::dispatch(...)->onQueue(...)`. Never write procedural `job(JobClass::class, ...)->dispatch(...)` in application code. Use `dispatchOnce()` for recurring jobs.
+- Facades: use first-class static facades under `Spark\Facades\*` (`DB`, `Auth`, `Gate`, `Cache`, `Lock`, `Mail`, `Http`, `Storage`, `Route`, `Log`, `Blade`, `Queue`, `Schema`, `Session`, `Validator`).
 - Paths: use config and helpers such as `storage_dir()`, `root_dir()`, `upload_dir()`, and `views_dir()`.
 - Framework uncertainty: inspect the matching source file under `./vendor/tinymvc/tinycore/src/` before guessing Laravel behavior.
 
@@ -74,6 +76,12 @@ Route::delete('/posts/{post}', [PostController::class, 'destroy']);
 - Do not edit framework/vendor files in an app unless asked.
 - Do not bypass config with hardcoded storage paths.
 - Do not use raw `$_POST`/`$_GET` in controllers when `Request` helpers are available.
+- Do not use procedural date functions (`gmdate()`, `date()`, `time()`, `strtotime()`); use `now()`, `carbon()`, and `Spark\Carbon`.
+- Do not call `->all()` or `->toArray()` on `$request->validated()` when passing to `Model::create()`, `fill()`, `QueryBuilder::update()`, or `Auth::attempt()`; `Input` is `Arrayable`.
+- Do not call `$model->delete()` on a model instance; use `$model->remove()`.
+- Do not write procedural `job(JobClass::class, ...)->dispatch(...)` in application code; use `JobClass::dispatch(...)`.
+- Do not manually parse or format dates in `JsonResource`; `JsonResource::normalize()` automatically serializes `Spark\Carbon`.
+- Do not wrap model arrays manually in `json(['data' => $post])`; use `PostResource::make($post)`.
 - Do not run non-OPTIONS controller logic for CORS preflight.
 - Do not send `Access-Control-Allow-Credentials: false`.
 - Do not mix queue config with cache config.

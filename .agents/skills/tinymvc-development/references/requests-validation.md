@@ -1,10 +1,12 @@
-# Requests and Validation
+# Requests, Validation, and Input
 
-Read this reference for HTTP requests, form validation, and FormRequest classes. All source paths and command working directories refer to the application root.
+Read this reference for HTTP requests, form validation, FormRequest classes, and the native `Spark\Http\Input` utility. All source paths and command working directories refer to the application root.
+
+---
 
 ## FormRequest: The Primary Validation Standard
 
-Always use dedicated **`Spark\Foundation\Http\FormRequest`** classes for resource creation, update, and complex actions. Form requests encapsulate authorization and validation outside of the controller, keeping actions clean and thin.
+Always use dedicated **`Spark\Foundation\Http\FormRequest`** classes for resource creation, update, deletions, and complex state changes. Form requests encapsulate authorization and validation outside of the controller, keeping controller actions remarkably thin, clean, and expressive.
 
 ### Defining a Form Request
 
@@ -16,13 +18,13 @@ Create form requests in `app/Http/Requests`:
 namespace App\Http\Requests;
 
 use Spark\Foundation\Http\FormRequest;
-use Spark\Http\Auth;
+use Spark\Facades\Auth;
 
 class StorePostRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     * Returning false automatically aborts with a 403 Forbidden.
+     * Returning false automatically aborts with a 403 Forbidden response.
      */
     public function authorize(): bool
     {
@@ -65,6 +67,17 @@ class StorePostRequest extends FormRequest
             'category_id' => 'category',
         ];
     }
+
+    /**
+     * Handle actions after successful validation (optional).
+     * Ideal for normalizations or derived fields before reaching the controller.
+     */
+    public function passedValidation(): void
+    {
+        if (!$this->has('slug') && $this->has('title')) {
+            $this->merge(['slug' => \Spark\Support\Str::slug($this->title)]);
+        }
+    }
 }
 ```
 
@@ -81,27 +94,130 @@ use Spark\Http\Response;
 public function store(StorePostRequest $request): Response
 {
     // The request is ALREADY authorized and validated!
-    // If authorize() returned false -> 403 Forbidden was thrown before reaching here.
-    // If rules failed -> 422 Unprocessable Entity was thrown before reaching here.
+    // - If authorize() returned false -> 403 Forbidden was thrown before reaching here.
+    // - If rules failed -> 422 Unprocessable Entity was thrown before reaching here.
 
-    $post = Post::create($request->validated()); // Note: tinycore/spark supports Arrayable
+    // Pass $request->validated() directly to Model::create() - it implements Arrayable!
+    $post = Post::create($request->validated());
 
     return PostResource::make($post)->response(201);
 }
 ```
 
-### Accessing Validated Data
+---
 
-- `$request->validated()` returns a `Spark\Http\Input` instance.
-- `$request->validated()->toArray()` or `$request->validated()->all()` returns a clean PHP array of only the validated fields.
-- `$request->validated('title')` retrieves a single validated field.
-- `$request->validated('is_featured', false)` retrieves with a default fallback.
+## The `Spark\Http\Input` Class: Smart, Fluent, and Arrayable
+
+When you call `$request->validated()` on a `FormRequest` or `$request->validate([...])` on a `Request`, Spark returns an instance of **`Spark\Http\Input`**.
+
+### Implemented Interfaces & Native Capabilities
+
+`Spark\Http\Input` implements:
+- **`Spark\Contracts\Support\Arrayable`**: Directly accepted by any Spark framework API expecting array-like data.
+- **`\ArrayAccess`**: Access values like an array: `$validated['title']`, `isset($validated['slug'])`.
+- **`\IteratorAggregate`**: Can be looped over directly with `foreach ($validated as $key => $value)`.
+- **`Spark\Contracts\Support\Jsonable`**: Can be serialized directly to JSON via `toJson()`.
+- **`\Stringable`**: Can be string cast.
+- **Magic Property Access**: Access fields as properties: `$validated->title`, `$validated->email`.
+
+### Arrayable Interoperability Across TinyCore
+
+Because `Input` implements `Arrayable`, **you do not need to call `->all()` or `->toArray()`** when passing validated data to native TinyCore components. All of the following accept `array|Arrayable`:
+
+1. **Model Persistence**:
+   - `Post::create($request->validated())`
+   - `Post::createOrUpdate($request->validated(), uniqueBy: ['slug'])`
+   - `Post::firstOrCreate($request->validated()->only('slug'), $request->validated()->except('slug'))`
+   - `Post::firstOrNew($request->validated()->only('slug'))`
+   - `$post->fill($request->validated())->save()`
+   - `$author->posts()->create($request->validated())`
+2. **QueryBuilder Operations**:
+   - `DB::table('logs')->insert($request->validated())`
+   - `Post::whereKey($id)->update($request->validated())`
+   - `Post::where($request->validated()->only(['category_id', 'status']))->get()`
+   - `Product::upsert($request->validated(), conflict: ['sku'], update: ['price', 'stock'])`
+3. **Authentication**:
+   - `Auth::attempt($request->validated()->only('email', 'password'), $request->boolean('remember'))`
+
+```php
+// BAD / NON-SMART - Redundant ->all() calls:
+$post = Post::create($request->validated()->all());
+Auth::attempt($request->validated()->only(['email', 'password'])->all());
+
+// GOOD / SMART & ELEGANT - Direct Arrayable passing:
+$post = Post::create($request->validated());
+Auth::attempt($request->validated()->only('email', 'password'), $request->boolean('remember'));
+```
+
+### Fluent Chaining on `Input`
+
+`Spark\Http\Input` provides powerful methods for data shaping that return a new `Input` instance (preserving `Arrayable` capability):
+
+```php
+// 1. only() - Filter keys (accepts array or variadic arguments)
+$credentials = $request->validated()->only('email', 'password');
+$subset = $request->validated()->only(['title', 'content']);
+
+// 2. except() - Exclude keys (accepts array or variadic arguments)
+$postData = $request->validated()->except('tags', 'send_notification');
+
+// 3. merge() and mergeRecursive() - Combine data
+$postData = $request->validated()->merge([
+    'user_id' => Auth::id(),
+    'published_at' => now(),
+]);
+
+// 4. map() and filter() - Transform values fluently
+$cleaned = $request->validated()
+    ->filter(fn ($v) => !is_null($v))
+    ->map(fn ($v) => is_string($v) ? trim($v) : $v);
+
+// Chaining it all together cleanly:
+$post = Post::create(
+    $request->validated()
+        ->merge(['user_id' => Auth::id()])
+        ->except('tags')
+);
+```
+
+### Typed and Sanitized Value Accessors
+
+`Input` includes typed extraction helpers:
+
+```php
+$title     = $request->validated()->string('title');          // string or null
+$isActive  = $request->validated()->boolean('is_active');      // bool (handles '1', 'true', 'on', etc.)
+$count     = $request->validated()->number('quantity');       // int or null
+$price     = $request->validated()->float('price');           // float or null
+$email     = $request->validated()->email('contact_email');   // sanitized email string or null
+$url       = $request->validated()->url('website');           // sanitized URL string or null
+$date      = $request->validated()->date('due_date');         // 'Y-m-d' date string
+$tags      = $request->validated()->collect('tags');          // Spark\Support\Collection
+$slug      = $request->validated()->slug('title');            // auto-slugified string
+$strObj    = $request->validated()->str('title');             // Spark\Support\Stringable
+$password  = $request->validated()->password('password', hash: true); // automatically bcrypt/argon2 hashed
+```
+
+### Direct Request Utilities
+
+`Spark\Http\Request` (and `FormRequest`) also exposes elegant first-class convenience methods directly:
+
+```php
+// Authenticated user and bearer token
+$user = $request->user();                    // Current authenticated Model (or null)
+$token = $request->bearerToken();            // 'Bearer eyJ...' extracted or null
+
+// Typed request inputs with defaults
+$page = $request->integer('page', default: 1);
+$remember = $request->boolean('remember', default: false);
+$comment = $request->safe('comment', allowedTags: ['<b>', '<i>']); // Strips unwanted HTML
+```
 
 ---
 
 ## Inline Request Validation
 
-Reserve inline `$request->validate([...])` **only** for lightweight search filters or simple single-field endpoints where a dedicated FormRequest would be excessive:
+Reserve inline `$request->validate([...])` **strictly** for lightweight search filters or simple single-field GET endpoints where a dedicated FormRequest would be excessive:
 
 ```php
 use App\Http\Resources\PostResource;
@@ -111,17 +227,18 @@ use Spark\Http\Resources\ResourceCollection;
 
 public function index(Request $request): ResourceCollection
 {
-    $validated = $request->validate([
+    // Returns Spark\Http\Input instance
+    $filters = $request->validate([
         'q' => 'nullable|string|max:100',
         'status' => ['nullable', 'string', ['in' => ['draft', 'published']]],
     ]);
 
     $query = Post::query()
-        ->when($validated->has('q'), function ($query) use ($validated) {
-            $query->whereContains('title', $validated->get('q'));
+        ->when($filters->filled('q'), function ($query) use ($filters) {
+            $query->whereContains('title', $filters->string('q'));
         })
-        ->when($validated->has('status'), function ($query) use ($validated) {
-            $query->where('status', $validated->get('status'));
+        ->when($filters->filled('status'), function ($query) use ($filters) {
+            $query->where('status', $filters->string('status'));
         });
 
     return PostResource::collection($query->latest()->paginate(20));
@@ -164,18 +281,19 @@ $rules = [
 
 ---
 
-## Request Input Helpers
+## File Uploads via Request / Input
 
-For reading raw request data:
+Check and process uploaded files:
 
 ```php
-$request->query('page', 1);            // Query string parameter
-$request->post('email');               // POST body parameter
-$request->input('email');              // Query or body parameter
-$request->only(['name', 'email']);     // Extract subset of input
-$request->except(['password']);        // Exclude specific fields
-$request->input()->boolean('active');  // Cast input to boolean
-$request->bearerToken();               // Extract token from Bearer header
-$request->file('avatar');              // Uploaded file instance
-$request->user();                      // Current authenticated user
+// Check for file
+if ($request->hasFile('avatar')) {
+    // Direct move with automatic thumbnail/optimization options
+    $path = $request->moveFile('avatar', disk: 'public', options: [
+        'uploadTo' => 'avatars',
+        'maxSize' => 2048,
+        'compress' => 90,
+        'resize' => [500 => 500],
+    ]);
+}
 ```

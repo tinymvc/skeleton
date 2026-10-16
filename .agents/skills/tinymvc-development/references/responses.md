@@ -169,11 +169,25 @@ return [
 ## Response Wrapping and Custom Metadata
 
 - **Wrapping**: Top-level resources default to a `'data'` envelope.
-  - `UserResource::make($user)->wrap('user')` changes the key to `'user'`.
-  - `UserResource::make($user)->withoutWrapping()` removes the outer wrapper.
+  - `UserResource::make($user)->wrap('user')` changes the top-level key to `'user'`.
+  - `UserResource::make($user)->withoutWrapping()` returns flat attributes without the outer wrapper.
 - **Additional Metadata**:
-  - `UserResource::make($user)->additional(['meta' => ['version' => '1.0']])`
-  - Or override `with(?Request $request = null): array` inside the resource class.
+  - `UserResource::make($user)->additional(['meta' => ['version' => '1.0']])` attaches custom root-level metadata.
+  - Or define static metadata by overriding `with(?Request $request = null): array` inside the resource class:
+
+```php
+// Example controller response with custom wrapper and metadata:
+return UserResource::make($user)
+    ->additional([
+        'meta' => [
+            'api_version' => 'v1',
+            'server_time' => now()->toIsoUtcString(),
+        ],
+    ]);
+
+// Example returning flat JSON without outer 'data' wrapper:
+return UserResource::make($user)->withoutWrapping();
+```
 
 ---
 
