@@ -1,6 +1,6 @@
 # Spark-Native Feature Map
 
-Read this reference when a task touches a framework service beyond the ordinary route/request/model/resource path. It provides a complete map of all core components across TinyMVC / TinyCore (Spark). Confirm exact signatures in `vendor/tinymvc/tinycore/src` using `php .agents/skills/tinymvc-development/scripts/api-lookup.php <term>`.
+Read this reference when a task touches a framework service beyond the ordinary route/request/model/resource path. It provides a complete map of all core components across the **TinyMVC / Spark** framework (implemented by the **TinyCore** engine). Confirm exact signatures in `vendor/tinymvc/tinycore/src` using `php .agents/skills/tinymvc-spark/scripts/api-lookup.php <term>`.
 
 ---
 
@@ -65,4 +65,4 @@ Read this reference when a task touches a framework service beyond the ordinary 
 - Keep request-specific identity, locale, tenant, and authorization in the current call. Do not store them in a singleton, static property, cache key omitted from a query, or serialized job accidentally.
 - Do not create a service layer or repository for a one-line operation. Do create a service to coordinate multiple models, a database transaction, cache/storage, external HTTP/mail, or retry/idempotency policy.
 - Do not swallow framework exceptions or turn a failed process, validation, authorization, transaction, queue, storage, or HTTP call into a success response.
-- When in doubt about exact method signatures, run `php .agents/skills/tinymvc-development/scripts/api-lookup.php <term>` to inspect the installed runtime declarations directly.
+- When in doubt about exact method signatures, run `php .agents/skills/tinymvc-spark/scripts/api-lookup.php <term>` to inspect the installed runtime declarations directly.

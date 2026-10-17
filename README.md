@@ -67,7 +67,7 @@ Full documentation is available at: [https://tinymvc.github.io](https://tinymvc.
 
 ## AI development
 
-Use the [TinyMVC development skill](.agents/skills/tinymvc-development/SKILL.md) for Spark-specific implementation and testing. Its `references/` folder contains the complete topic-based framework guidance and application examples. Copy the entire skill folder when adopting it in another application; [AGENTS.md](AGENTS.md) provides the project entry point.
+Use the [TinyMVC Spark skill](.agents/skills/tinymvc-spark/SKILL.md) for Spark-specific implementation and testing. Its `references/` folder contains the complete topic-based framework guidance and application examples. Copy the entire skill folder when adopting it in another application; [AGENTS.md](AGENTS.md) provides the project entry point.
 
 ## Contributing
 

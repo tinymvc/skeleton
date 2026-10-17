@@ -7,10 +7,10 @@ Use when a signature, return type, optional parameter or method location is unce
 From the application root:
 
 ```bash
-php .agents/skills/tinymvc-development/scripts/api-lookup.php upsert
-php .agents/skills/tinymvc-development/scripts/api-lookup.php transaction --file=Database/
-php .agents/skills/tinymvc-development/scripts/api-lookup.php whenLoaded
-php .agents/skills/tinymvc-development/scripts/api-lookup.php PendingDispatch --limit=40
+php .agents/skills/tinymvc-spark/scripts/api-lookup.php upsert
+php .agents/skills/tinymvc-spark/scripts/api-lookup.php transaction --file=Database/
+php .agents/skills/tinymvc-spark/scripts/api-lookup.php whenLoaded
+php .agents/skills/tinymvc-spark/scripts/api-lookup.php PendingDispatch --limit=40
 ```
 
 The dependency-free PHP tool reads declarations without booting the app, requiring source files, connecting to services, or executing application code. Output is limited to 25 matching declarations by default, with signatures and absolute source locations. Narrow with `--file=substring`; `--limit=1..200` controls output. `--source=/path/to/tinycore/src` explicitly selects a different checkout. The default is `vendor/tinymvc/tinycore/src` relative to the current working directory, never an automatic sibling-checkout fallback.

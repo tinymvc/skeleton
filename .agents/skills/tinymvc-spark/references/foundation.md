@@ -11,21 +11,25 @@ Contents:
 
 Read this reference for what tinymvc is, typical application layout, core bootstrap, configuration, request lifecycle summary. Source paths and command working directories refer to the application root unless explicitly stated otherwise. Check the installed package when versions differ.
 
-## What TinyMVC Is
+## What TinyMVC / Spark Is
 
-TinyMVC is a small PHP framework powered by the TinyCore package.
+TinyMVC is the vendor; the root framework is known as **TinyMVC / Spark** (or simply **Spark**).
 
-- Core package: `tinymvc/tinycore`
-- Core namespace: `Spark\\`
-- Minimum PHP: `8.2`
-- Style: Laravel-like ergonomics, custom implementation
-- Dependency injection: `Spark\Foundation\Application` extends `Spark\Container`
-- Routing: `Spark\Http\Routing\Router`
-- HTTP: `Spark\Http\Request`, `Spark\Http\Response`, `Spark\Http\Middleware`
-- Database: PDO wrapper, query builder, active-record-like models, schema/migrations
-- Storage utilities: database, file, or Redis cache, locks, sessions, and queues
+- **Vendor**: `tinymvc` (the vendor namespace for packages like `tinymvc/*` on Packagist and GitHub)
+- **Root Framework**: `tinymvc/spark` (Spark) — provides the `Spark\` PHP namespace alias, all Spark facades (`Spark\Facades\*`), Spark contracts, and the `php spark` CLI runner
+- **Core Framework / Engine**: `tinymvc/tinycore` (TinyCore) — the underlying core framework package installed at `vendor/tinymvc/tinycore`
+- **Application Boilerplate**: `tinymvc/skeleton` (Skeleton) — the starter project and repository where applications are built
+- **Core Namespace**: `Spark\`
+- **CLI Runner**: `php spark`
+- **Minimum PHP**: `8.2`
+- **Architecture & Style**: Laravel-like ergonomics with high performance, clean Spark-native APIs
+- **Dependency injection**: `Spark\Foundation\Application` extends `Spark\Container`
+- **Routing**: `Spark\Http\Routing\Router`
+- **HTTP**: `Spark\Http\Request`, `Spark\Http\Response`, `Spark\Http\Middleware`
+- **Database**: PDO wrapper, query builder, active-record-like models, schema/migrations
+- **Storage utilities**: database, file, or Redis cache, locks, sessions, and queues
 
-Do not assume Laravel classes such as `Illuminate\Http\Request`, `Illuminate\Support\Facades\Route`, `artisan`, Eloquent, or Laravel middleware internals exist. Use the `Spark\\` classes and global helpers documented here.
+Do not assume Laravel classes such as `Illuminate\Http\Request`, `Illuminate\Support\Facades\Route`, `artisan`, Eloquent, or Laravel middleware internals exist. Use the `Spark\` classes and global helpers documented here.
 
 ## Framework Source Lookup Paths
 

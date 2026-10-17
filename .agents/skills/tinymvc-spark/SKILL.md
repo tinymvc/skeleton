@@ -1,16 +1,24 @@
 ---
-name: tinymvc-development
+name: tinymvc-spark
 description: Implement, debug, review, and test TinyMVC applications powered by TinyCore/Spark. Use for Spark-native PHP, routes, controllers, validation, ORM, JSON resources, Blade, FireLine, Inertia, storage, queues, cache, HTTP, auth, and other framework features, or for explicitly requested TinyCore changes.
 ---
 
-# TinyMVC Development (Spark / TinyCore)
+# TinyMVC Spark Development
 
-Write modern, smart, clean, and beautiful Laravel-style PHP against the installed TinyCore framework. The goal is familiar architecture and elegant application code while strictly utilizing Spark's native features, facades, contracts, return types, lifecycle, and frontend protocols. Laravel syntax is a style and elegance reference, never proof that an Illuminate API exists.
+Write modern, smart, clean, and beautiful Laravel-style PHP against the **TinyMVC / Spark** framework. The goal is familiar architecture and elegant application code while strictly utilizing Spark's native features, facades, contracts, return types, lifecycle, and frontend protocols. Laravel syntax is a style and elegance reference, never proof that an Illuminate API exists.
+
+### Framework Naming & Architecture Taxonomy
+
+Always maintain precise clarity regarding the framework's naming and component roles:
+- **`tinymvc`**: The **vendor** namespace across all packages (e.g. `tinymvc/*` packages on Packagist and GitHub).
+- **`tinymvc/spark` (Spark)**: The **root framework** name. It uses the `Spark\` PHP namespace alias, all Spark facades (`Spark\Facades\*`), Spark contracts, and the `php spark` CLI runner.
+- **`tinymvc/tinycore` (TinyCore)**: The **core framework engine** provided by TinyMVC, installed at `vendor/tinymvc/tinycore`. It implements the Spark runtime engine.
+- **`tinymvc/skeleton` (Skeleton)**: The official application **boilerplate** and starter project for building applications with Spark.
 
 ## Establish the context before coding
 
 1. Work from the application root. Read `composer.json`, `composer.lock`, bootstrap routing/provider files, the nearest feature, and its tests before adding a new pattern.
-2. Treat `vendor/tinymvc/tinycore/src` as the runtime source of truth for the installed version. Read the declaration and method body when a signature or behavior matters. Use [API discovery](references/api-discovery.md) (`php .agents/skills/tinymvc-development/scripts/api-lookup.php <term>`) for bounded lookups.
+2. Treat `vendor/tinymvc/tinycore/src` as the runtime source of truth for the installed version. Read the declaration and method body when a signature or behavior matters. Use [API discovery](references/api-discovery.md) (`php .agents/skills/tinymvc-spark/scripts/api-lookup.php <term>`) for bounded lookups.
 3. Check whether the task is application code, an optional frontend/integration (Blade, FireLine, Inertia + React/Vue), documentation, or an explicitly requested core change. During normal app work, vendor files are reference only; do not patch them or upgrade dependencies to make an example fit.
 4. Load the primary reference for the feature, then only the related references it crosses. The references are a maintained decision guide, not a substitute for inspecting the target app.
 
@@ -308,7 +316,7 @@ Inspect the installed packages and existing entrypoints before choosing a fronte
 Trace one existing route → action → request → model/service → response/view path before generating files. Then:
 
 1. State the user-visible contract and frontend representation.
-2. Inspect the installed declarations and nearby code for every uncertain method using `php .agents/skills/tinymvc-development/scripts/api-lookup.php <term>`.
+2. Inspect the installed declarations and nearby code for every uncertain method using `php .agents/skills/tinymvc-spark/scripts/api-lookup.php <term>`.
 3. Add only the route, middleware, FormRequest, model scope/relation, resource/view, service/job, and migration pieces the feature needs.
 4. Preserve ownership, tenant boundaries, casts, loaded relations, transactions, retry behavior, and external side-effect ordering.
 5. Verify persisted state and response shape, not only a status code. Check the actual frontend protocol when an adapter is involved.
