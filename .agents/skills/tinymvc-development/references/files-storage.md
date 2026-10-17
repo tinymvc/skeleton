@@ -1,70 +1,179 @@
-# Files Storage
+# Files, Storage, and Image Utilities
 
-Read this reference for files and uploads. Source paths and command working directories refer to the application root unless explicitly stated otherwise. Check the installed package when versions differ.
+Read this reference for filesystem storage, S3 integration, disk uploaders, and the native `File`, `Image`, and `JWT` utilities in TinyMVC / TinyCore (Spark). All paths refer to the application root.
 
-## Files and Uploads
+---
 
-Use **`Spark\Facades\Storage`** for filesystem storage that may be local, public, or S3-compatible. Configuration is in `config/storage.php`; `FILESYSTEM_DISK` chooses the default.
+## Filesystem Storage (`Spark\Facades\Storage`)
+
+Use **`Spark\Facades\Storage`** for filesystem operations across local, public, and S3-compatible disks. Configuration is located in `config/storage.php`; `FILESYSTEM_DISK` chooses the default.
+
+### Common Operations
 
 ```php
 use Spark\Facades\Storage;
 
-// Working with default disk
-Storage::put('reports/result.txt', 'Ready');
-$contents = Storage::get('reports/result.txt');
-$exists = Storage::exists('reports/result.txt');
-Storage::delete('reports/result.txt');
+// Default disk operations
+Storage::put('reports/annual.txt', 'Summary data');
+$contents = Storage::get('reports/annual.txt');
+$exists = Storage::exists('reports/annual.txt');
+$missing = Storage::missing('reports/annual.txt');
+Storage::delete('reports/annual.txt');
 
-// Working with specific disks (public, s3)
+// Explicit disk operations ('public', 'local', 's3')
 Storage::disk('public')->put('avatars/user-1.jpg', $imageContent);
-$url = Storage::disk('public')->url('avatars/user-1.jpg');
+$publicUrl = Storage::disk('public')->url('avatars/user-1.jpg');
 
-// Disk uploaders
-$path = Storage::disk('public')
-    ->uploader('avatars', extensions: ['jpg', 'png'], maxSize: 2048)
-    ->upload($request->file('avatar'));
+// Copy and Move
+Storage::disk('public')->copy('avatars/old.jpg', 'avatars/new.jpg');
+Storage::disk('public')->move('temp/file.pdf', 'documents/file.pdf');
+
+// Metadata
+$size = Storage::disk('public')->size('avatars/user-1.jpg');
+$mime = Storage::disk('public')->mimeType('avatars/user-1.jpg');
+$lastModified = Storage::disk('public')->lastModified('avatars/user-1.jpg');
+
+// Listing files
+$files = Storage::disk('public')->files('avatars');
+$allFiles = Storage::disk('public')->allFiles('documents');
 ```
 
-- `local` defaults to private `storage/app/private`; `public` uses `storage/app/public` and the existing `storage:link` mapping. Keys are relative paths, never URLs or absolute paths. Traversal is rejected; local child symlinks are not followed.
-- Use `putFile($directory, $localPath)` or `putFileAs($directory, $localPath, $name)` for trusted existing local files. These return keys and preserve the source. HTTP uploads must use genuine PHP upload files; size checks use their actual size, not a submitted size value.
-- Disk-backed uploaders retain extension/size validation, image resizing, variants, and cleanup. Their driver destinations and returned paths are disk-relative. Staging lives under private `storage/framework/temp/storage-uploads`.
-- `Spark\Storage\S3UploaderDriver` implements the existing `UploaderDriverInterface` and delegates to `Spark\Storage\S3Storage`. Configure AWS or compatible endpoints, region, bucket, key/secret, optional session token, optional public/CDN URL, and path-style addressing. ACLs are omitted by default; use `acl: public-read` only for an ACL-enabled public bucket.
-- `exists`, `missing`, `get`, `put`, `copy`, `move`, `delete`, `files`, `allFiles`, `size`, `mimeType`, and `lastModified` share the storage API. Storage failures throw; missing-file deletion succeeds. Arrays and moves are not atomic. Local copies stream; S3 copies run on the server and preserve object metadata.
-- `path()` is local-only. `url()` requires a configured URL on local storages and does not grant public access on S3. `temporaryUrl($key, $secondsOrDateTime)` is S3-only, signs the origin, and allows 1–604800 seconds. Authorize private downloads first.
-- Signed S3 URLs include an attachment content-disposition response override using `basename($key)` as the download filename. Do not modify the signed query. There is no custom filename or inline-display option, and URL generation itself does not check object existence.
-- S3 uses SigV4 with cURL; listings use SimpleXML. Single PUTs are limited to 5 GiB; multipart uploads, bucket management, and automatic role-credential discovery/refresh are not implemented. Validate behavior and policy on the selected provider.
-- Config files load before application config is merged: use `dirname(__DIR__)` for filesystem defaults there, not `storage_dir()` / `media_url()`. Those helpers are available in running application code.
+- **`local`**: Defaults to private storage at `storage/app/private`.
+- **`public`**: Uses `storage/app/public` exposed via the public symlink (`php spark storage:link`).
+- Keys are always relative paths within the disk (e.g. `avatars/1.jpg`), never leading slashes or absolute paths.
 
+---
 
-Request file helpers:
+## Disk Uploaders
+
+Use disk-backed uploaders for automatic file validation, resizing, and variant generation:
 
 ```php
-if ($request->hasFile('avatar')) {
-    $uploadPath = $request->moveFile('avatar', disk: 'public', options: [
-        'uploadTo' => 'avatars',
-        'maxSize' => 2048,
-        'compress' => 90,
-        'resize' => [500 => 500]
-    ]);
+use Spark\Facades\Storage;
+
+$path = Storage::disk('public')
+    ->uploader('avatars', extensions: ['jpg', 'png', 'webp'], maxSize: 2048)
+    ->upload($request->file('avatar'));
+
+// Fluent uploader with image compression and resizing
+$path = Storage::disk('public')
+    ->uploader('photos', compress: 85, resize: [800 => 600])
+    ->upload('photo');
+```
+
+---
+
+## S3 Direct Operations and Signed URLs
+
+When using the `s3` storage driver:
+
+```php
+use Spark\Facades\Storage;
+
+// 1. Temporary Download URL (signed S3 URL with expiry in seconds)
+$downloadUrl = Storage::disk('s3')->temporaryUrl('invoices/inv-101.pdf', seconds: 3600);
+
+// 2. Direct Browser Upload Signed URL
+$signedPutUrl = Storage::disk('s3')->temporaryUploadUrl(
+    'uploads/raw-video.mp4',
+    seconds: 300,
+    contentType: 'video/mp4',
+);
+```
+
+---
+
+## Local Filesystem Utility (`Spark\Utils\File` and `fm()`)
+
+For direct local server filesystem manipulation, use `Spark\Utils\File` (or the global `fm()` helper):
+
+```php
+use Spark\Utils\File;
+
+// 1. Existence and Type Checks
+File::exists($path);
+File::isFile($path);
+File::isDirectory($path);
+File::isReadable($path);
+File::isWritable($path);
+
+// 2. Reading and Writing Content
+$contents = File::get($path);
+File::put($path, 'Content to save');
+File::append($path, "\nNew log line");
+File::prepend($path, "Header line\n");
+
+// 3. Moving, Copying & Deleting
+File::copy($source, $destination);
+File::move($from, $to);
+File::delete($path);
+File::delete([$path1, $path2]);
+
+// 4. Directory Management
+File::ensureDirectoryExists(storage_dir('exports'));
+File::makeDirectory(storage_dir('reports'), mode: 0755, recursive: true);
+
+// 5. File Properties and Names
+$ext = File::extension($path);         // 'jpg'
+$name = File::name($path);             // 'avatar' (without extension)
+$basename = File::basename($path);     // 'avatar.jpg'
+$dirname = File::dirname($path);       // '/path/to'
+$size = File::size($path);             // bytes
+$mime = File::mimeType($path);         // 'image/jpeg'
+```
+
+---
+
+## Image Manipulation (`Spark\Utils\Image` and `image()`)
+
+TinyCore includes native image manipulation powered by GD via `Spark\Utils\Image`:
+
+```php
+use Spark\Utils\Image;
+
+// Resize and compress an image
+Image::from(storage_dir('uploads/original.jpg'))
+    ->resize(800, 600)
+    ->compress(80, destination: storage_dir('uploads/thumb.jpg'));
+
+// Bulk resizing to multiple formats
+$image = Image::from($sourcePath);
+$image->bulkResize([
+    'small' => [150, 150],
+    'medium' => [400, 400],
+    'large' => [1200, 800],
+]);
+
+// Rotate image
+$image->rotate(90);
+```
+
+---
+
+## JWT Utilities (`Spark\Utils\JWT`)
+
+For low-level JSON Web Token encoding and decoding:
+
+```php
+use Spark\Utils\JWT;
+
+// Encode payload
+$payload = [
+    'sub' => $user->id,
+    'role' => $user->role,
+    'exp' => now()->addHours(2)->timestamp,
+];
+
+$jwt = JWT::encode($payload, key: config('app.key'), algo: 'HS256');
+
+// Decode and verify
+try {
+    $decoded = JWT::decode($jwt, key: config('app.key'), verify: true);
+    $userId = $decoded['sub'];
+} catch (\Throwable $e) {
+    abort(401, 'Invalid or expired token.');
 }
 ```
 
-Utilities:
-
-- `Storage::disk('public')->uploader(compress: 90)->upload('avatar')`
-- `Uploader::make(compress: 90, ...)->upload('avatar')`
-- `uploader()->...`
-- `Spark\Utils\File` for static local filesystem operations, or `fm()` returning a `File` instance
-- `image()`
-
-Inspect existing app usage before implementing uploads.
-
-### S3 direct uploads and downloads
-
-`storage('s3')->temporaryUploadUrl($key, $seconds = 300, $contentType = null, $acl = null)` returns a signed PUT URL (expiry 1–604800 seconds). Send a raw body, with matching Content-Type and x-amz-acl headers when supplied. ACL is explicit, not inferred from disk config. Authorize the key and configure bucket CORS for browser uploads. The URL does not run uploader validation. `downloadFile($key, $localPath)` streams to a temporary file then replaces the local destination on success; failures preserve existing content. The wrapper creates parents. These APIs are S3-only.
-
-`storage('s3')->storage()` exposes the underlying client (local disks return `LocalStorage`); it differs from the uploader `getDriver()`. Low-level `S3Storage::moveFile()` copies then deletes; `deleteDirectory($prefix)` deletes a paginated raw prefix and returns the count. It is not on the disk interface. An empty prefix is rejected; `reports/` scopes a directory while `reports` also matches `reports-old.csv`. Neither operation is atomic and versioned buckets can retain historical versions.
-
-
-
-
+> [!TIP]
+> For standard API authentication, prefer **`Auth::createToken()`** and **`Auth::revokeToken()`**, which automatically integrate with TinyCore's authentication guards and token revocation tables.

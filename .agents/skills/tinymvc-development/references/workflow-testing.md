@@ -1,178 +1,222 @@
 # Workflow Testing
 
-Contents:
+Read this reference for unit and feature testing, test assertions, database verification, and regression workflows in TinyMVC / TinyCore (Spark). All paths refer to the application root.
 
-- [How To Use This File](#how-to-use-this-file)
-- [AI Agent Decision Rules](#ai-agent-decision-rules)
-- [Common Feature Recipe](#common-feature-recipe)
-- [Common Mistakes To Avoid](#common-mistakes-to-avoid)
-- [Testing](#testing)
-- [Verification Checklist For AI Agents](#verification-checklist-for-ai-agents)
-- [Diagnose before changing behavior](#diagnose-before-changing-behavior)
-- [Core checkout verification](#core-checkout-verification)
+---
 
-Read this reference for how to use this file, ai agent decision rules, common feature recipe, common mistakes to avoid, testing, verification checklist for ai agents. Source paths and command working directories refer to the application root unless explicitly stated otherwise. Check the installed package when versions differ.
+## The Dependency-Free Test Runner
 
-## How To Use This File
-
-1. Identify whether the user is changing an application, TinyCore, an optional integration, or documentation. Follow the existing app's choices and the user's requested scope.
-2. Inspect the relevant entry points: `composer.json`, installed package version, `bootstrap/app.php`, the matching routes/controller/model, and nearby tests. Check `package.json` only when frontend work is involved. Read only the configuration needed for the task; do not dump `.env` secrets.
-3. Choose the matching references in [the skill](../SKILL.md). For uncertain signatures or side effects, inspect the installed method body, its traits, and the app's own wrappers. Method names resembling Laravel are not evidence of identical behavior.
-4. Implement a complete path through the relevant layers: route and middleware, input validation/authorization, persistence, response/view, and a focused regression when the behavior warrants it. Do not generate unused layers or change the frontend stack by default.
-5. Validate against the configured test environment. Report the behavior changed, checks run, and any dependency or driver limitation that remains.
-
-This file is framework guidance, not a replacement for the user's task. Commands below describe development workflows; examples of migrations, purges, workers, and external services are not instructions to execute them on live data. Generate and review the necessary code first, and use the intended test environment for verification.
-
-## AI Agent Decision Rules
-
-Use this file to choose the right framework APIs; use the installed implementation and existing app behavior to resolve version differences. Update only the relevant guidance when behavior changes.
-
-Prefer these choices:
-
-- Routes: use `Spark\Facades\Route` when the app imports it, otherwise use `router()`.
-- Controllers: return `JsonResource`/`ResourceCollection` for JSON entities and lists, `json()` for intentional message/scalar contracts, and `view()`/redirects for browser responses.
-- Validation & Input: use `Spark\Foundation\Http\FormRequest` for meaningful writes and authorization. Remember that `Spark\Http\Input` returned by `$request->validated()` implements `Arrayable` and `ArrayAccess`. Pass it directly into `Model::create()`, `Model::createOrUpdate()`, `$model->fill()`, `QueryBuilder::update()`, and `Auth::attempt()` without calling `->all()` or `->toArray()`.
-- Dates & Times: **Never use legacy PHP date functions** (`gmdate()`, `date()`, `time()`, `strtotime()`). TinyCore configures application timezone (UTC) on boot. Always use `now()`, `carbon()`, `Spark\Carbon`, and Carbon formatting methods (`toDateTimeString()`, `toDateString()`, `toIsoUtcString()`, `timestamp`). Pass Carbon instances directly to resources and queries.
-- Database: use `Spark\Database\Model` static queries, scopes, and relations for domain tables; use `query($table)` only for unmodeled/framework or deliberately low-level work. Execute with `->get()` (Collections) and `->paginate()` rather than `->all()`.
-- Background work: always dispatch application jobs statically via `Spark\Queue\Dispatchable`: `JobClass::dispatch(...)->onQueue(...)`. Never write procedural `job(JobClass::class, ...)->dispatch(...)` in application code. Use `dispatchOnce()` for recurring jobs.
-- Facades: use first-class static facades under `Spark\Facades\*` (`DB`, `Auth`, `Gate`, `Cache`, `Lock`, `Mail`, `Http`, `Storage`, `Route`, `Log`, `Blade`, `Queue`, `Schema`, `Session`, `Validator`).
-- Paths: use config and helpers such as `storage_dir()`, `root_dir()`, `upload_dir()`, and `views_dir()`.
-- Framework uncertainty: inspect the matching source file under `./vendor/tinymvc/tinycore/src/` before guessing Laravel behavior.
-
-## Common Feature Recipe
-
-For a new API resource, use only the pieces the feature needs; reuse existing schema, models and requests where suitable:
-
-1. Create migration in `database/migrations`.
-2. Create model in `app/Models`.
-3. Create request class in `app/Http/Requests` for create/update/state-changing workflows and any meaningful authorization/validation.
-4. Create controller in `app/Http/Controllers/Api`.
-5. Add routes in `routes/api.php`.
-6. Add middleware only if needed.
-7. Create a `JsonResource` and return `Resource::make()`/`Resource::collection()` for entity payloads; use `json()` only for an intentional non-resource contract.
-8. Use model/query builder APIs and native relations, not raw table queries for model-backed entities.
-
-Example:
-
-```php
-// routes/api.php
-use App\Http\Controllers\Api\PostController;
-use Spark\Facades\Route;
-
-Route::get('/posts', [PostController::class, 'index']);
-Route::post('/posts', [PostController::class, 'store']);
-Route::get('/posts/{post}', [PostController::class, 'show']);
-Route::put('/posts/{post}', [PostController::class, 'update']);
-Route::delete('/posts/{post}', [PostController::class, 'destroy']);
-```
-
-## Common Mistakes To Avoid
-
-- Do not import Laravel's route facade. Use `Spark\Facades\Route` or `router()` depending on the app style.
-- Do not import `Illuminate\\*` classes.
-- Do not create Laravel `FormRequest`, `Middleware`, `Migration`, or `Model` classes.
-- Do not use `artisan`; TinyMVC has its own console command system through `php spark`.
-- Do not assume Eloquent relationship syntax is identical. Inspect existing models.
-- Do not edit framework/vendor files in an app unless asked.
-- Do not bypass config with hardcoded storage paths.
-- Do not use raw `$_POST`/`$_GET` in controllers when `Request` helpers are available.
-- Do not use procedural date functions (`gmdate()`, `date()`, `time()`, `strtotime()`); use `now()`, `carbon()`, and `Spark\Carbon`.
-- Do not call `->all()` or `->toArray()` on `$request->validated()` when passing to `Model::create()`, `fill()`, `QueryBuilder::update()`, or `Auth::attempt()`; `Input` is `Arrayable`.
-- Do not call `$model->delete()` on a model instance; use `$model->remove()`.
-- Do not write procedural `job(JobClass::class, ...)->dispatch(...)` in application code; use `JobClass::dispatch(...)`.
-- Do not manually parse or format dates in `JsonResource`; `JsonResource::normalize()` automatically serializes `Spark\Carbon`.
-- Do not wrap model arrays manually in `json(['data' => $post])`; use `PostResource::make($post)`.
-- Do not run non-OPTIONS controller logic for CORS preflight.
-- Do not send `Access-Control-Allow-Credentials: false`.
-- Do not mix queue config with cache config.
-- Do not use Laravel queue APIs such as `onConnection()` unless the app has added its own compatibility layer.
-
-## Testing
-
-TinyMVC includes a dependency-free plain PHP runner. Run `php test` or
-`composer test`. Options: `--testsuite Unit|Feature`, `--filter text`, and
-`--list-tests`; pass options to Composer after `--`.
-
-- Unit tests: `tests/Unit/*Test.php`, extending `Spark\Testing\TestCase`.
-- Application feature tests: `tests/Feature/*Test.php`, extending `Tests\TestCase`.
-- Feature lifecycle: `Spark\Testing\ApplicationTestCase` creates a fresh app.
-- Response assertions: `Spark\Testing\TestResponse` wraps `Spark\Http\Response`.
-- Entry point and test config: the root `test` runner, `tests/TestCase.php`, and `tests/config.php`; follow any custom bootstrap present in the app.
-
-Tests are public non-static `test*` methods without arguments. Use strict
-assertions such as `assertSame`, `assertTrue`, `assertCount`, and `assertArrayHasKey`.
-The runner supports setup/teardown, expected exception class/message/code,
-`assertThrows`, and explicit `markTestSkipped`. Failures, warnings,
-and empty test selections produce non-zero exits.
-
-Feature helpers include `get`, `post`, `getJson`, `postJson`, and
-`request($method, $uri, $data, $headers, json: true)`. Responses support
-`assertOk`, `assertStatus`, `assertSee`, `assertHeader`, `assertRedirect`, and
-`assertJson` (complete JSON equality with strict types), `assertJsonPath`,
-`assertJsonFragment`, `assertJsonStructure`, `assertJsonCount`, and
-`assertJsonValidationErrors`. Common HTTP verbs also have named helpers, including
-`put`, `patch`, `delete`, `options`, `head`, `putJson`, `patchJson`, and `deleteJson`.
-Use `withHeaders`, `withToken`, `withSession`, `withCookies`, and `actingAs` for
-request state. `assertDatabaseHas`, `assertDatabaseMissing`, and
-`assertDatabaseCount` inspect the configured test database. Application tests live
-in the skeleton's `tests/`. In a TinyCore source checkout, use `php tests/run.php --filter SoftDeleteTest` or
-`php tests/database.php --filter SoftDeleteTest` for the three-engine matrix.
-
-`APP_ENV=testing` must be set before creating a CLI application. In that mode,
-`.env` and config caches are skipped; `Application::create()` merges
-`tests/config.php` before provider registration. The feature base supplies a
-unique per-test storage path under `storage/framework/testing` in the skeleton; the supplied config uses in-memory SQLite. Override `testStorageDirectory()` before application boot to choose the parent directory. Core defaults to the system temporary directory. Normal cleanup removes only the current test’s directory, including after failures, and preserves the shared parent and `.gitignore`. Custom teardown must call its parent in `finally`. After forced termination, remove abandoned directories only when no tests are running. Middleware,
-including CSRF, remains active. Unexpected exceptions reach the runner; early
-responses, redirects, aborts, and validation errors are captured. Deferred work
-runs after each successful request without flushing the runner's buffers.
-
-Use the built-in assertions and small PHP stub objects by default. Do not introduce another test runner or Laravel-specific test traits just to write a regression; honor an existing app test stack or an explicit user request to change it.
-
-## Verification Checklist For AI Agents
-
-Before finishing changes in a TinyMVC app:
-
-1. Run `php -l` on every changed PHP file.
-2. Check route/controller namespaces match the app.
-3. Check middleware aliases exist in `bootstrap/middlewares.php`.
-4. Check config keys and APIs against the installed framework and app overrides.
-5. If changing DB code, verify schema/model names, return types, and active/archive/owner boundaries using an isolated database.
-6. If changing CORS/CSRF/throttle, test normal request and preflight/invalid cases when possible.
-7. For drivers, run file/SQLite and real Redis tests, contention tests, native HTTP session tests, and migrations up/down. Run MySQL/PostgreSQL integration tests on the exact production versions before release.
-8. Run `git diff --check`.
-9. Run relevant tests with `php test --filter=Name` or `composer test -- --filter=Name`; run the full suite for shared behavior changes. Run `npm run build` when frontend assets change.
-10. Mention anything not tested.
-
-
-## Diagnose before changing behavior
-
-Reproduce the smallest failing request or operation using the existing test harness. Follow its route registration, middleware order, action, model/query, and response path. Inspect the exception and first relevant application/framework frame; do not hide unexpected exceptions with a catch-all response.
-
-For database failures, record the driver, bindings, schema, returned rows and persisted state. Distinguish a stale builder, missing scope, cast mismatch, and SQL dialect difference. For HTTP failures, inspect the effective method, headers, route parameters, guard and middleware. For cached behavior, inspect the selected connection, namespace, configuration cache and compiled views before changing source.
-
-Add a regression that fails for the demonstrated behavior, implement the smallest correction, then run the focused test. Broaden to the suite when the correction affects shared behavior. Do not encode the buggy output as the expected contract or loosen an assertion merely to pass.
-
-## Core checkout verification
-
-Application commands above run application tests. From a TinyCore source checkout use:
+TinyMVC includes a native, high-performance, plain PHP test runner:
 
 ```bash
-php tests/run.php --filter SoftDeleteTest
-php tests/database.php --filter SoftDeleteTest
-php tests/run.php
-php tests/database.php
+# Run the entire test suite
+php test
+
+# Or via composer
+composer test
+
+# Run a specific test suite (Unit or Feature)
+php test --testsuite Feature
+
+# Filter tests by class or method name
+php test --filter PostTest
+php test --filter test_can_create_post
+
+# List all discovered tests
+php test --list-tests
 ```
 
-Inspect `tests/config.php` before service-dependent runs. The database matrix creates and cleans disposable MySQL/PostgreSQL databases and also runs SQLite; its administrative credentials need creation/deletion privileges. The full suite includes configured Redis and local HTTP/S3 fixtures. Missing dependencies and skipped cases must be reported separately from passing checks. Do not run tests against application data.
+---
 
-| Changed behavior | Useful assertions |
-| --- | --- |
-| Endpoint or middleware | Successful result, invalid input, unauthenticated/other-owner access, headers and early responses |
-| Database/model | Returned value/type, stored state, unaffected rows, null/empty boundaries, rollback, query count and driver parity |
-| Cache/locks | Expiry, missing versus null, namespace isolation, owner mismatch, contention and release after exceptions |
-| Queue | Claim exclusivity, retry/failure, delayed availability, duplicate dispatch and visibility after commit |
-| Session | Flash consumption, login regeneration, logout/invalidation, expiry and native HTTP handler persistence |
-| Blade/resource | Escaping, omitted/null fields, fresh/cached output, buffer recovery and query-free serialization |
-| Storage/client | Rejected paths, partial failures, cleanup and provider request/response contracts |
+## Writing Tests: Unit vs. Feature
 
-Use real service checks where emulation cannot establish the contract. An in-process application session test does not prove PHP cookie/session transport. A local S3 fixture does not certify a live cloud account. Test counts are behavioral evidence, not line/branch coverage or a production guarantee.
+### 1. Unit Tests (`tests/Unit/*Test.php`)
+
+Unit tests extend **`Spark\Testing\TestCase`** and verify isolated business logic, models, support classes, or services without booting the HTTP kernel:
+
+```php
+<?php
+
+namespace Tests\Unit;
+
+use Spark\Support\Str;
+use Spark\Testing\TestCase;
+
+final class SlugTest extends TestCase
+{
+    public function test_it_generates_url_friendly_slugs(): void
+    {
+        $slug = Str::slug('Building Modern APIs with TinyMVC');
+
+        $this->assertSame('building-modern-apis-with-tinymvc', $slug);
+    }
+}
+```
+
+### 2. Feature Tests (`tests/Feature/*Test.php`)
+
+Feature tests extend **`Tests\TestCase`** (which extends `Spark\Testing\ApplicationTestCase`). They boot a fresh application instance in an isolated temporary storage and testing database environment:
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Post;
+use App\Models\User;
+use Tests\TestCase;
+
+final class PostApiTest extends TestCase
+{
+    public function test_can_list_paginated_posts(): void
+    {
+        $response = $this->getJson('/api/posts');
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'data' => [
+                    '*' => ['id', 'title', 'slug'],
+                ],
+                'links',
+                'meta' => ['current_page', 'total'],
+            ]);
+    }
+
+    public function test_authenticated_user_can_create_post(): void
+    {
+        $user = User::create([
+            'name' => 'Alex Developer',
+            'email' => 'alex@example.com',
+            'password' => 'secret123',
+        ]);
+
+        $payload = [
+            'title' => 'First TinyMVC Post',
+            'content' => 'Full article body content.',
+            'category_id' => 1,
+        ];
+
+        $response = $this->actingAs($user)
+            ->postJson('/api/posts', $payload);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.title', 'First TinyMVC Post');
+
+        $this->assertDatabaseHas('posts', [
+            'title' => 'First TinyMVC Post',
+            'user_id' => $user->id,
+        ]);
+    }
+
+    public function test_validation_errors_return_422(): void
+    {
+        $response = $this->postJson('/api/posts', []);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['title', 'content']);
+    }
+}
+```
+
+---
+
+## Request and State Helpers on `$this`
+
+In feature tests, `$this` provides modern HTTP verbs and state configurators:
+
+### 1. HTTP Verbs
+- `$this->get(string $uri, array $headers = [])`
+- `$this->post(string $uri, array $data = [], array $headers = [])`
+- `$this->put(string $uri, array $data = [], array $headers = [])`
+- `$this->patch(string $uri, array $data = [], array $headers = [])`
+- `$this->delete(string $uri, array $data = [], array $headers = [])`
+- `$this->options(string $uri, array $data = [], array $headers = [])`
+- `$this->head(string $uri, array $headers = [])`
+
+### 2. JSON Shortcuts (sets `Accept: application/json` & `X-Requested-With`)
+- `$this->getJson(string $uri, array $headers = [])`
+- `$this->postJson(string $uri, array $data = [], array $headers = [])`
+- `$this->putJson(string $uri, array $data = [], array $headers = [])`
+- `$this->patchJson(string $uri, array $data = [], array $headers = [])`
+- `$this->deleteJson(string $uri, array $data = [], array $headers = [])`
+
+### 3. Request State, Authentication & Headers
+- `$this->actingAs(Model $user)`: Logs in a user for subsequent requests in the test.
+- `$this->withToken(string $token, string $type = 'Bearer')`: Sets the Authorization header.
+- `$this->withHeaders(array $headers)`: Adds custom HTTP headers.
+- `$this->flushHeaders()`: Clears default headers.
+- `$this->withSession(array $data)`: Flashes session variables.
+- `$this->withCookie(string $name, string $value)` / `$this->withCookies(array $cookies)`.
+
+---
+
+## Response Assertions (`Spark\Testing\TestResponse`)
+
+The `$response` returned by `$this->get()`, `$this->postJson()`, etc. provides fluent assertions:
+
+### Status Code Assertions
+- `assertOk()`: Asserts HTTP 200.
+- `assertCreated()`: Asserts HTTP 201.
+- `assertAccepted()`: Asserts HTTP 202.
+- `assertNoContent(int $status = 204)`: Asserts HTTP 204 with empty body.
+- `assertUnauthorized()`: Asserts HTTP 401.
+- `assertForbidden()`: Asserts HTTP 403.
+- `assertNotFound()`: Asserts HTTP 404.
+- `assertUnprocessable()`: Asserts HTTP 422.
+- `assertTooManyRequests()`: Asserts HTTP 429.
+- `assertServerError()`: Asserts HTTP 500.
+- `assertSuccessful()`: Asserts HTTP 2xx.
+- `assertStatus(int $code)`: Asserts exact status code.
+
+### JSON Payload Assertions
+- `assertJson(mixed $expected)`: Strict JSON equality check.
+- `assertExactJson(mixed $expected)`: Alias for `assertJson()`.
+- `assertJsonPath(string $path, mixed $expected)`: Asserts nested JSON value using dot notation (`assertJsonPath('data.user.role', 'admin')`).
+- `assertJsonCount(int $count, ?string $path = null)`: Asserts number of items in array at root or path.
+- `assertJsonValidationErrors(string|array $fields)`: Asserts HTTP 422 and verifies errors exist for given fields.
+- `assertJsonFragment(array $fragment)`: Asserts that key/value fragment exists at any depth in the JSON.
+- `assertJsonStructure(array $structure, ?string $path = null)`: Verifies JSON keys and nested array structure (supports `'*'` for list items).
+
+### Content and Header Assertions
+- `assertSee(string $text)`: Asserts response body contains string.
+- `assertDontSee(string $text)`: Asserts response body does not contain string.
+- `assertHeader(string $name, string $value)`: Asserts specific HTTP header value.
+- `assertHeaderMissing(string $name)`: Asserts HTTP header is absent.
+- `assertRedirect(string $url, int $status = 302)`: Asserts redirect status and Location header.
+
+---
+
+## Database and Authentication Assertions
+
+Feature test cases provide built-in database inspection against the configured testing database:
+
+```php
+// Check that a database record exists matching criteria
+$this->assertDatabaseHas('users', [
+    'email' => 'alex@example.com',
+    'is_active' => true,
+]);
+
+// Check that a database record does not exist
+$this->assertDatabaseMissing('posts', [
+    'slug' => 'deleted-post',
+]);
+
+// Check exact row count in a table
+$this->assertDatabaseCount('orders', 3);
+
+// Authentication state assertions
+$this->assertAuthenticated();
+$this->assertGuest();
+```
+
+---
+
+## AI Agent Verification Checklist
+
+Before finishing code changes:
+1. Run `php -l` on every created or edited PHP file.
+2. Run focused tests: `php test --filter=YourTestName`.
+3. Verify that all HTTP responses return exact expected contracts (`JsonResource` for entities, `json()` for messages, `noContent()` for deletions).
+4. Run frontend build if assets changed: `npm run build`.
+5. Ensure zero warnings or unhandled exceptions.

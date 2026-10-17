@@ -1,32 +1,37 @@
-# Responses and API Resources
+# Responses, API Resources, and Frontend Envelopes
 
-Read this reference for HTTP responses, JSON resources, redirects, and API contracts. All source paths and commands are relative to the application root.
+Read this reference for HTTP responses, JSON resources, redirects, and API contracts in TinyMVC / TinyCore (Spark). All source paths and commands are relative to the application root.
 
-## API Responses and JSON Resources
+---
 
-For APIs, use **`Spark\Http\Resources\JsonResource`** for entity and collection presentation. Do **not** manually construct an entity envelope such as `json(['data' => $post])` or `return ['data' => $post]` in a resource controller. Use `json()` for a message, scalar, webhook, or other intentionally non-resource contract.
+## REST API Responses and JSON Resources
 
-### Standard Controller Responses
+For REST APIs, use **`Spark\Http\Resources\JsonResource`** for all entity and collection presentations. Do **not** manually construct an entity envelope such as `json(['data' => $post])` or `return ['data' => $post]` in a resource controller. Use `json()` for a message, scalar, webhook, or other intentionally non-resource contract.
+
+### Standard Controller Response Patterns
 
 ```php
-// Single entity (defaults to 200 OK with 'data' envelope)
+// 1. Single Entity (HTTP 200 OK with 'data' envelope)
 return PostResource::make($post);
 
-// Created entity (201 Created)
+// 2. Created Entity (HTTP 201 Created)
 return PostResource::make($post)->response(201);
-// or: return response(PostResource::make($post), 201);
+// Or: return response(PostResource::make($post), 201);
 
-// Collection of entities
+// 3. Collection of Entities (HTTP 200 OK with 'data' array)
 return PostResource::collection($posts);
 
-// Paginated collection (automatically includes 'data', 'links', and 'meta')
-return PostResource::collection(Post::latest()->paginate(20));
+// 4. Paginated Collection (HTTP 200 OK automatically including 'data', 'links', and 'meta')
+return PostResource::collection(Post::published()->latest()->paginate(20));
 
-// No Content (e.g. after deletion)
-return response()->noContent(); // 204 No Content
+// 5. Successful Deletion / Empty State (HTTP 204 No Content)
+return response()->noContent();
 
-// Simple scalar/message response (NOT for models or entity data)
-return json(['message' => 'Password reset email sent.']);
+// 6. Simple Message, Status, or Webhook (NOT for models or entity data)
+return json(['message' => 'Password reset email sent.'], 200);
+
+// 7. Explicit Operation Error Message
+return json(['message' => 'The provided invitation code has expired.'], 400);
 ```
 
 ---
@@ -49,6 +54,9 @@ use Spark\Http\Resources\JsonResource;
  */
 class PostResource extends JsonResource
 {
+    /**
+     * Transform the resource into an array.
+     */
     public function toArray(?Request $request = null): array
     {
         return [
@@ -57,18 +65,19 @@ class PostResource extends JsonResource
             'slug' => $this->slug,
             'content' => $this->content,
 
-            // Relations: use whenLoaded() to avoid unintended N+1 queries
+            // Relations: use whenLoaded() to prevent unexpected N+1 queries
             'author' => $this->whenLoaded('author', fn ($author) => UserResource::make($author)),
             'comments' => $this->whenLoaded('comments', fn ($comments) => CommentResource::collection($comments)),
+            'tags' => $this->whenLoaded('tags', fn ($tags) => TagResource::collection($tags)),
             'comments_count' => $this->whenCounted('comments'),
 
             // Dates: do NOT manually call Carbon::parse() or ->toIsoUtcString()!
-            // JsonResource::normalize() automatically formats Spark\Carbon instances into ISO-8601 UTC strings.
+            // JsonResource::normalize() automatically serializes Spark\Carbon into ISO-8601 UTC strings.
             'published_at' => $this->published_at,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
 
-            // URLs: Spark\Url objects are automatically resolved to URL strings
+            // URLs: Spark\Url objects are automatically normalized to URL strings
             'url' => route('posts.show', ['post' => $this->slug]),
         ];
     }
@@ -83,18 +92,20 @@ class PostResource extends JsonResource
 > - Instances of `Spark\Carbon` are automatically converted via `->toIsoUtcString()`.
 > - Instances of `DateTimeInterface` are automatically formatted as `DateTimeInterface::ATOM`.
 > 
-> Because model timestamps (`created_at`, `updated_at`) and attributes cast with `'datetime'` or `'date'` are already `Spark\Carbon` objects.
+> Because model timestamps (`created_at`, `updated_at`) and attributes cast with `'datetime'` or `'date'` are already `Spark\Carbon` objects, pass them directly without manual parsing or formatting.
 
 ```php
-// BAD - DO NOT DO THIS:
+// BAD / UN-SMART:
 $data = [
     'created_at' => Carbon::parse($this->created_at)->toIsoUtcString(),
     'created_at' => $this->created_at?->toIsoUtcString(),
+    'created_at' => gmdate('Y-m-d\TH:i:s\Z', strtotime($this->created_at)),
 ];
 
-// GOOD - Idiomatic Spark:
+// GOOD / SMART & ELEGANT:
 $data = [
     'created_at' => $this->created_at,
+    'published_at' => $this->published_at,
 ];
 ```
 
@@ -102,21 +113,21 @@ $data = [
 
 ## Conditional Attributes in Resources
 
-Use built-in conditional helpers to omit keys when conditions are not met:
+Use built-in conditional helpers on `JsonResource` to keep resource output clean and omission-aware:
 
 - **`when($condition, $value, $default = MissingValue)`**: Includes `$value` only if `$condition` is truthy.
 - **`unless($condition, $value, $default = MissingValue)`**: Includes `$value` only if `$condition` is falsy.
 - **`whenNotNull($value, $default = MissingValue)`**: Includes `$value` only when not null.
-- **`whenHas($attribute, $value = MissingValue)`**: Includes value only if the attribute exists on the underlying resource.
-- **`whenLoaded($relation, $value = MissingValue)`**: Includes the relation only if it was eager loaded on the model (`$model->relationLoaded($relation)`). Never triggers an unexpected lazy query.
-- **`whenCounted($relation)`**: Shorthand for `$this->whenHas($relation . '_count')`.
+- **`whenHas(string $attribute, $value = MissingValue)`**: Includes value only if the attribute exists on the underlying resource.
+- **`whenLoaded(string $relation, $value = MissingValue)`**: Includes the relation only if it was eager loaded on the model (`$model->relationLoaded($relation)`). Never triggers an unexpected lazy query.
+- **`whenCounted(string $relation)`**: Shorthand for `$this->whenHas($relation . '_count')`.
 
 ```php
 return [
     'id' => $this->id,
-    'secret' => $this->when($request?->user('is_admin'), $this->secret),
+    'secret_code' => $this->when($request?->user()?->isAdmin(), $this->secret_code),
     'author' => $this->whenLoaded('author', fn ($author) => UserResource::make($author)),
-    'tags_count' => $this->whenCounted('tags'),
+    'comments_count' => $this->whenCounted('comments'),
     ...$this->when($this->is_featured, fn () => [
         'featured_at' => $this->featured_at,
         'badge' => 'Featured',
@@ -135,8 +146,8 @@ return [
    ```json
    {
        "data": [
-           { "id": 1, "title": "First" },
-           { "id": 2, "title": "Second" }
+           { "id": 1, "title": "First Post" },
+           { "id": 2, "title": "Second Post" }
        ]
    }
    ```
@@ -191,23 +202,28 @@ return UserResource::make($user)->withoutWrapping();
 
 ---
 
-## Web Responses and Redirects
+## Web Responses, Redirects & Error Bags
 
 For traditional server-rendered web routes:
 
 ```php
-// Render a Blade template
+// Render a Blade template with data
 return view('posts.show', ['post' => $post]);
 
 // Redirect to a specific URL
 return redirect('/dashboard');
 
-// Redirect to a named route
-return to_route('posts.show', ['post' => $post->id]);
+// Redirect to a named route with parameters
+return to_route('posts.show', ['post' => $post->slug]);
 
-// Redirect back with validation errors and old input
-return back()->withErrors(['email' => 'Invalid credentials'])->withInput();
+// Redirect back with validation errors and old input flashed to session
+return back()->withErrors(['email' => 'Invalid credentials.'])->withInput();
 
 // Empty 204 No Content response
 return response()->noContent();
+
+// Download a generated file
+return response()->download($fileContents, 'report.pdf', [
+    'Content-Type' => 'application/pdf',
+]);
 ```

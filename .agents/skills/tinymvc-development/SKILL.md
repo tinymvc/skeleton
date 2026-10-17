@@ -3,15 +3,15 @@ name: tinymvc-development
 description: Implement, debug, review, and test TinyMVC applications powered by TinyCore/Spark. Use for Spark-native PHP, routes, controllers, validation, ORM, JSON resources, Blade, FireLine, Inertia, storage, queues, cache, HTTP, auth, and other framework features, or for explicitly requested TinyCore changes.
 ---
 
-# TinyMVC development
+# TinyMVC Development (Spark / TinyCore)
 
-Write modern, smart, clean, and beautiful Laravel-style PHP against the installed TinyCore implementation. The goal is familiar architecture and elegant application code while strictly utilizing Spark's native features, facades, contracts, return types, lifecycle, and frontend protocols. Laravel syntax is a style and elegance reference, never proof that an Illuminate API exists.
+Write modern, smart, clean, and beautiful Laravel-style PHP against the installed TinyCore framework. The goal is familiar architecture and elegant application code while strictly utilizing Spark's native features, facades, contracts, return types, lifecycle, and frontend protocols. Laravel syntax is a style and elegance reference, never proof that an Illuminate API exists.
 
 ## Establish the context before coding
 
 1. Work from the application root. Read `composer.json`, `composer.lock`, bootstrap routing/provider files, the nearest feature, and its tests before adding a new pattern.
-2. Treat `vendor/tinymvc/tinycore/src` as the runtime source of truth for the installed version. Read the declaration and method body when a signature or behavior matters. Use [API discovery](references/api-discovery.md) for bounded lookups.
-3. Check whether the task is application code, an optional frontend/integration, documentation, or an explicitly requested core change. During normal app work, vendor files are reference only; do not patch them or upgrade dependencies to make an example fit.
+2. Treat `vendor/tinymvc/tinycore/src` as the runtime source of truth for the installed version. Read the declaration and method body when a signature or behavior matters. Use [API discovery](references/api-discovery.md) (`php .agents/skills/tinymvc-development/scripts/api-lookup.php <term>`) for bounded lookups.
+3. Check whether the task is application code, an optional frontend/integration (Blade, FireLine, Inertia + React/Vue), documentation, or an explicitly requested core change. During normal app work, vendor files are reference only; do not patch them or upgrade dependencies to make an example fit.
 4. Load the primary reference for the feature, then only the related references it crosses. The references are a maintained decision guide, not a substitute for inspecting the target app.
 
 ## Spark-first architecture rules
@@ -20,48 +20,67 @@ These rules are defaults for new and edited code. Follow a nearby application co
 
 ### Smart vs. Non-Smart Syntax Standards
 
-Always write smart, elegant, and native Spark syntax. Compare standard patterns below:
+Always write smart, elegant, and native Spark syntax (reminiscent of the clean, intentional aesthetic of Laravel Boost). Compare standard patterns below:
 
-| Feature / Pattern | Non-Smart / Legacy Syntax ❌ | Smart & Elegant Spark Syntax ✅ |
+| Feature / Domain | Non-Smart / Legacy Syntax ❌ | Smart & Elegant Spark Syntax ✅ |
 | --- | --- | --- |
+| **REST API Entity** | `json(['data' => $post])` or `return $post->toArray()` | `PostResource::make($post)` |
+| **REST API Collection**| Manual loops or `json(['data' => $posts])` | `PostResource::collection($posts)` |
+| **REST API Paginator** | Hand-crafted `links` and `meta` arrays | `PostResource::collection(Post::latest()->paginate(20))` *(Envelopes auto-added)* |
+| **REST API Message** | `response(json_encode(['msg' => 'Done']))` | `json(['message' => 'Password reset email sent.'], 200)` |
 | **Current Timestamp** | `gmdate('Y-m-d H:i:s')` or `date(...)` | `now()->toDateTimeString()` |
 | **Date Arithmetic** | `time() + 86400` or `strtotime('+7 days')` | `now()->addDays(7)` or `now()->addHours(2)` |
 | **Date Parsing** | `new DateTime($val)` or `date('Y-m-d', strtotime($val))` | `carbon($val)` or `Carbon::parse($val)` |
 | **Job Dispatching** | `job(SendMail::class, [$id])->dispatch('emails')` | `SendMail::dispatch($id)->onQueue('emails')` |
+| **Recurring Jobs** | Procedural dispatch in loop | `SyncReports::dispatchOnce()->repeatEveryMinutes(5)` |
 | **Request Validation** | Controller inline validation with manual array conversions | Dedicated `FormRequest` class injected into action |
-| **Arrayable Input** | `Model::create($request->validated()->all())` | `Model::create($request->validated())` |
+| **Arrayable Input** | `Model::create($request->validated()->all())` | `Model::create($request->validated())` *(Direct Arrayable)* |
 | **Input Shaping** | `array_merge($request->validated()->all(), ['user_id' => $id])` | `$request->validated()->merge(['user_id' => Auth::id()])` |
 | **Model Creation** | `$post = new Post(); $post->title = ...; $post->save();` | `Post::create($request->validated())` |
 | **Model Deletion** | `$model->delete();` *(QueryBuilder only!)* | `$model->remove();` *(Instance method)* or `Post::destroy($id)` |
 | **Database Transactions** | `DB::getDB()->beginTransaction(); ... DB::commit();` | `DB::transaction(fn () => ...);` |
-| **Distributed Locks** | Sleep loops or procedural lock checks | `Lock::withLock('order:1', fn () => ..., timeout: 10)` |
+| **Distributed Locks** | Sleep loops or procedural lock checks | `Lock::withLock('order:1', fn () => ..., timeout: 10, waitTimeout: 5)` |
 | **Cache Storing** | `if (!Cache::has($k)) { Cache::put($k, ...); }` | `Cache::remember('key', fn () => ..., '+1 hour')` |
 | **Collections** | `$users->map(fn ($u) => $u->title)` | `$users->map->title` *(Higher-Order Proxy)* |
 | **Collection Filtering**| `$users->filter(fn ($u) => $u->is_active)` | `$users->filter->is_active` *(Higher-Order Proxy)* |
+| **Number Formatting** | `number_format($n, 2) . ' USD'` or custom size logic | `Number::currency($n, 'USD')` or `Number::fileSize($bytes)` |
+| **String Manipulation**| `strtolower(str_replace(' ', '-', $title))` | `str($title)->slug()` or `Str::slug($title)` |
 | **Blade UI Components** | `@include('partials.alert', ['message' => $msg])` | `<x-alert :$message type="success" />` or `<x-alert :message="$msg" />` |
 | **Blade Session Access**| `\Spark\Facades\Session::get('status')` | `session('status')` or `@session('status')` |
 | **Blade Auth User** | `\Spark\Facades\Auth::user()` | `auth()->user()` or `user()` or `@auth` |
 | **Blade Service Access**| `\Spark\Facades\App::make('service')` | `app('service_alias')` or `app(Class::class)` |
-| **JSON Resources** | `json(['data' => $post])` or manual `Carbon::parse()` | `PostResource::make($post)` *(Dates auto-converted to ISO UTC)* |
-| **Outbound HTTP** | `curl_init()` or `file_get_contents()` | `Http::withToken($token)->post($url, $payload)` |
+| **Blade Error Bags** | Manual session error parsing | `@error('title') {{ $message }} @enderror` or `@errors('tags')` |
+| **JSON Resources** | Manual `Carbon::parse()` or `->toIsoUtcString()` in resource | Dates passed untouched; `JsonResource::normalize()` auto-serializes UTC |
+| **Outbound HTTP** | `curl_init()` or `file_get_contents()` | `Http::withToken($token)->timeout(10)->post($url, $payload)` |
+| **Password Hashing** | `password_hash($pass, PASSWORD_BCRYPT)` | `Hash::make($password)` or `Hash::check($password, $hash)` |
 | **Environment Check** | `getenv('APP_ENV') === 'testing'` | `App::isTesting()` or `App::isDebugMode()` |
+| **Testing HTTP** | Manual cURL or procedural request mocks | `$this->getJson('/api/posts')->assertOk()->assertJsonStructure([...])` |
+| **FireLine Actions** | Raw HTML strings returned to AJAX | `fire('pages/about', $props)` or `fire()->success('Profile saved.')` |
+| **Inertia Actions** | Custom JSON page envelopes | `Inertia::render('Posts/Index', ['posts' => $posts])` or `inertia()` |
+
+---
 
 ### 1. Choose the response contract from the frontend
 
 | Consumer | Preferred controller result |
 | --- | --- |
-| JSON API entity or entity list | `ThingResource::make($thing)` or `ThingResource::collection($items)` |
-| JSON API paginator | `ThingResource::collection($query->paginate(20))`; the collection adds `data`, `links`, and `meta` |
-| JSON API status, message, scalar, webhook, or deliberately non-resource document | `json([...], $status)` with the exact documented contract |
-| Browser/Blade | `view(...)`, `redirect(...)`, `to_route(...)`, or `response()->noContent()` |
-| FireLine visit/form | the installed FireLine `fire()`/`Fire::render()` response and its redirect/error helpers |
-| Inertia visit/form | the installed Inertia `inertia()`/adapter response and redirect flow |
+| **JSON API entity or entity list** | `ThingResource::make($thing)` or `ThingResource::collection($items)` |
+| **JSON API paginator** | `ThingResource::collection($query->paginate(20))`; automatically supplies `data`, `links`, and `meta` |
+| **JSON API status, message, scalar, or webhook** | `json(['message' => 'Your message.'], $status = 200)` with the exact contract |
+| **Browser / Blade** | `view('posts.show', ['post' => $post])`, `redirect('/url')`, `to_route('name', $params)`, or `response()->noContent()` |
+| **FireLine visit / form** | `fire('pages/about', $props)`, `Spark\Fire\Fire::render()`, `fire()->success($msg)`, or `fire()->navigate($url)` |
+| **Inertia visit / form** | `Inertia::render('Posts/Index', $props)` or `inertia('Posts/Index', $props)` followed by redirect on writes |
 
-For API resources, define a `Spark\Http\Resources\JsonResource` per public entity and expose an explicit field list. Do not hand-wrap a model in `json(['data' => ...])`, return a model array from a resource controller, or manually build pagination metadata. `json()` remains appropriate for a message or a contract that is intentionally not a resource. Use `whenLoaded()` and `whenCounted()` so resources do not create N+1 queries. Pass model date and URL objects through unchanged; `JsonResource::normalize()` converts `Spark\Carbon` and `Spark\Url` recursively into ISO-8601 UTC strings and URL strings.
+For API resources, define a dedicated `Spark\Http\Resources\JsonResource` per public entity and expose an explicit attribute list.
+- **Never hand-wrap a model in `json(['data' => ...])`** in resource controllers.
+- **Never manually build pagination envelopes**; pass the `Spark\Utils\Paginator` directly to `ThingResource::collection($paginator)`.
+- Use `whenLoaded()` and `whenCounted()` to avoid N+1 queries.
+- Pass model date attributes through unchanged; `JsonResource::normalize()` converts `Spark\Carbon` and `Spark\Url` recursively into ISO-8601 UTC strings and URL strings.
+- Use `json(['message' => '...'], $status)` only for intentional scalar messages, webhooks, or non-resource operations.
 
 ### 2. Validate and authorize at the request boundary with FormRequest & Input
 
-Use a dedicated `Spark\Foundation\Http\FormRequest` for create, update, delete/state-change, uploads, and any validation or authorization with meaningful policy. Type-hint it in the action; construction performs `authorize()` and `rules()` before the action runs.
+Use a dedicated `Spark\Foundation\Http\FormRequest` for create, update, delete/state-change, uploads, and any action with meaningful policy. Type-hint it in the controller action; construction executes `authorize()` and `rules()` before the action runs.
 
 #### The `Spark\Http\Input` Class: Smart, Fluent, and Arrayable
 `$request->validated()` returns a `Spark\Http\Input` instance. It implements:
@@ -80,7 +99,7 @@ Because `Input` implements `Arrayable`, **pass it directly** into any TinyCore A
 - `Auth::attempt($request->validated()->only('email', 'password'), $request->boolean('remember'))`
 
 ```php
-// BAD / UN-SMART - Redundant ->all() or ->toArray() conversions:
+// BAD / NON-SMART - Redundant ->all() or ->toArray() conversions:
 $post = Post::create($request->validated()->all());
 Auth::attempt($request->validated()->only(['email', 'password'])->all());
 
@@ -98,7 +117,7 @@ $post = Post::create(
 $post->fill($request->validated())->save();
 ```
 
-Inline `$request->validate([...])` is suitable only for small, read-only filters or a genuinely trivial one-field action.
+Inline `$request->validate([...])` is reserved strictly for small, read-only search filters or genuinely trivial single-field endpoints.
 
 ### 3. Never use legacy PHP date functions; use native `Spark\Carbon` and `now()`
 
@@ -151,21 +170,23 @@ ProcessPayment::dispatchSync($order->id);
 ### 5. Use native static facades (`Spark\Facades\*`) in backend PHP
 
 TinyCore provides first-class static facades under `Spark\Facades\*`. In backend PHP classes (controllers, services, jobs, models, middleware, commands), always prefer facades over procedural global helpers for core services:
-- **Database (`DB`)**: `DB::transaction(fn() => ...)`, `DB::table('users')`, `DB::raw(...)`.
-- **Auth (`Auth`)**: `Auth::check()`, `Auth::user()`, `Auth::id()`, `Auth::attempt(...)`, `Auth::loginUsingId($id)`.
+- **Database (`DB`)**: `DB::transaction(fn() => ...)`, `DB::table('users')`, `DB::raw(...)`, row locking `lockForUpdate()`.
+- **Auth (`Auth`)**: `Auth::check()`, `Auth::user()`, `Auth::id()`, `Auth::attempt(...)`, `Auth::loginUsingId($id)`, `Auth::createToken()`, `Auth::revokeToken()`.
 - **Gate (`Gate`)**: `Gate::define(...)`, `Gate::check(...)`, `Gate::allows(...)`, `Gate::denies(...)`, `Gate::authorize(...)`.
 - **Cache (`Cache`)**: `Cache::remember('key', fn() => ..., '+1 hour')`, `Cache::get(...)`, `Cache::put(...)`, `Cache::forget(...)`, `Cache::make('store')`.
 - **Lock (`Lock`)**: `Lock::withLock('order:1', fn() => ..., timeout: 10, waitTimeout: 5)`, `Lock::lock(...)`, `Lock::unlock(...)`.
 - **Mail (`Mail`)**: `Mail::to($user->email, $user->name)->subject('Welcome')->view('emails.welcome', ['user' => $user])->send();`.
-- **HTTP Client (`Http`)**: `$response = Http::withToken($token)->post('https://api.example.com/data', $payload);` check with `$response->successful()` and `$response->json('data.id')`.
+- **HTTP Client (`Http`)**: `$response = Http::withToken($token)->timeout(10)->post($url, $payload);` check with `$response->successful()` and `$response->json('data.id')`.
 - **Storage (`Storage`)**: `Storage::disk('public')->put('path/file.txt', $data);` or `Storage::disk('public')->url($path)`.
 - **Session (`Session`)**: `Session::get('key')`, `Session::put('key', $val)`, `Session::flash('status', $msg)`.
 - **Schema (`Schema`)**: `Schema::create('posts', function (Blueprint $table) { ... })`, `Schema::table(...)`.
 - **Validator (`Validator`)**: `Validator::make($rules, $data)`.
 - **Blade (`Blade`)**: `Blade::directive('name', fn() => ...)`, `Blade::share('key', $val)`.
 - **Log (`Log`)**: `Log::info('Message', ['context' => 1])`, `Log::error(...)`.
-- **Hash (`Hash`)**: `Hash::make('password')`, `Hash::check('password', $hash)`.
+- **Hash (`Hash`)**: `Hash::make('password')`, `Hash::check('password', $hash)`, `Hash::bcrypt($pass)`, `Hash::argon2id($pass)`.
 - **Route (`Route`)**: `Route::get(...)`, `Route::post(...)`, `Route::resource(...)`, `Route::group(...)`.
+- **Queue (`Queue`)**: `Queue::size()`, `Queue::clear()`.
+- **Event (`Event`)**: `Event::listen('event', $listener)`, `Event::dispatch('event', ...$args)`.
 
 > [!CAUTION]
 > **Never use static facades inside Blade templates!**
@@ -177,6 +198,7 @@ TinyCore provides first-class static facades under `Spark\Facades\*`. In backend
 - **Smart Syntax**: Pass variables directly via shorthand `<x-alert :$message type="success" />` or bound expression `<x-alert :message="$msg" type="success" />`. Pass child markup into the default `$slot` (`<x-card>Content</x-card>`). Use dot notation for nested directories: `<x-forms.input name="email" :value="old('email')" />` maps to `resources/views/components/forms/input.blade.php`.
 - **Ban `@include('partials...')` for UI components**: Reserve `@include()` solely for large static document sections or email templates.
 - **Strictly Global Helpers in Blade**: In templates, use `session('status')`, `old('email')`, `auth()->user()`, `user()`, `app('alias')`, `route('posts.show', $post->slug)`, `now()`. Never reference `\Spark\Facades\*` inside Blade templates.
+- **Error Directives**: Use `@error('field') <p class="text-red-500">{{ $message }}</p> @enderror` or `@errors('tags')` to render validation feedback directly from `Spark\Http\InputErrors`.
 
 ### 7. Use the ORM for domain entities
 
@@ -205,7 +227,15 @@ Remember the installed return contracts:
   }
   ```
 
-### 9. Fluent migrations with foreign key constraints
+### 9. Modern Laravel 12 Support Primitives (`Str`, `Arr`, `Number`, `Js`)
+
+Take full advantage of modern Laravel 12 support utilities:
+- **`Spark\Support\Str` & `str()`**: Fluent string manipulation (`str('Hello World')->slug()`, `Str::uuid()`, `Str::random(32)`, `Str::headline()`, `Str::contains()`).
+- **`Spark\Support\Arr`**: Dot-notation data retrieval (`Arr::get($data, 'user.address.city')`, `Arr::only()`, `Arr::except()`, `Arr::dot()`).
+- **`Spark\Support\Number`**: Modern number, currency, and file size formatting (`Number::currency(49.99, 'USD')`, `Number::fileSize($bytes)`, `Number::percentage(0.85)`).
+- **`Spark\Support\Js`**: Secure JS data encoding (`Js::from($data)`).
+
+### 10. Fluent migrations with foreign key constraints
 
 Use Spark's expressive foreign key constraint methods on blueprints:
 
@@ -226,24 +256,26 @@ Schema::create('posts', function (Blueprint $table) {
 
 Constraint methods on `foreignId`: `cascadeOnDelete()`, `cascadeOnUpdate()`, `setNullOnDelete()`, `setNullOnUpdate()`, `restrictOnDelete()`, `restrictOnUpdate()`, `noActionOnDelete()`, `noActionOnUpdate()`.
 
-### 10. Keep controllers thin and services purposeful
+### 11. Keep controllers thin and services purposeful
 
 Controllers coordinate route/request/model/service/response work. Keep query composition close to models as scopes and relations. Put multi-step domain workflows, transactions, external effects, cache invalidation, file operations, or reusable business rules in focused `app/Services/*Service` classes. Do not create repositories, service layers, DTOs, or pipelines for a one-line operation; do create a service when it gives a stable responsibility and a testable boundary.
 
 Prefer constructor or action injection through the Spark container. Do not capture a current request, user, tenant, PDO connection, or open transaction in a singleton or queued job. Use jobs for durable work, `defer()` only for small process-local post-response work, `Spark\Concurrency` for independent bounded tasks, and `Spark\Console\Process` for bounded subprocesses.
 
-### 11. Use route model binding when the contract fits
+### 12. Use route model binding when the contract fits
 
 Define `{post}` or `{post:slug}` and type-hint `Post $post` in the action. Spark resolves the model with `firstOrFail()` before invocation. Keep parameter names aligned. Use an explicit query/service when lookup needs ownership, compound conditions, trash visibility, or a non-model result; binding alone never proves authorization.
 
-### 12. Follow the local style
+### 13. Follow the local style (The Boost Standard)
 
 - Four spaces, no tabs; class and method braces on the next line; braces for all control flow.
 - One statement per line, descriptive names, explicit visibility and types where the real contract permits.
 - Keep imports correct and minimal. The application base controller is `App\Http\Controllers\Controller`; request input is `Spark\Http\Input`.
 - Put one call per line in long chains and one entry per line in long arrays/argument lists, with trailing commas.
-- Prefer guard clauses, focused methods, direct expressions, and `fn (...) => ...` only for one expression. Avoid nested ternaries, hidden side effects, redundant wrappers, and comments that restate code.
-- Use Spark's native validation, resources, relations, scopes, collections, `Arr`, `Str`, helpers, facades, cache/lock, queue, storage, HTTP, auth, Blade, and date utilities before inventing replacements.
+- Prefer guard clauses (`abort_if`, `abort_unless`, `throw_if`, `throw_unless`), focused methods, direct expressions, and `fn (...) => ...` only for single expressions. Avoid nested ternaries, hidden side effects, redundant wrappers, and comments that restate code.
+- Use Spark's native validation, resources, relations, scopes, collections, `Arr`, `Str`, `Number`, helpers, facades, cache/lock, queue, storage, HTTP, auth, Blade, and date utilities before inventing replacements.
+
+---
 
 ## Frontend and feature routing
 
@@ -252,13 +284,14 @@ Inspect the installed packages and existing entrypoints before choosing a fronte
 | Work | Read first | Spark-native direction |
 | --- | --- | --- |
 | routes/controllers/binding | [routing and controllers](references/routing-controllers.md) | `Spark\Facades\Route`, named routes, groups, resource routes, typed model binding |
-| request/input/validation | [requests and validation](references/requests-validation.md) | `Request`, `Input` (`Arrayable`/`ArrayAccess`), `Validator`, `FormRequest`, file input |
+| request/input/validation | [requests and validation](references/requests-validation.md) | `Request`, `Input` (`Arrayable`/`ArrayAccess`), `InputErrors`, `Validator`, `FormRequest`, file input |
 | dates/time/Carbon | [localization and dates](references/localization-dates.md) | `now()`, `carbon()`, `Spark\Carbon`; never `gmdate()`/`date()`/`time()`; auto ISO serialization in resources |
-| models/ORM/soft deletes | [models and relations](references/models-relations.md), [soft deletes](references/soft-deletes.md) | casts, scopes, relations, `with*`, `whereHas*`, `remove()`, events |
+| models/ORM/soft deletes | [models and relations](references/models-relations.md), [soft deletes](references/soft-deletes.md) | casts, scopes, relations, `with*`, `whereHas*`, `$model->remove()`, events |
 | SQL/transactions/locks | [queries](references/queries.md), [advanced workflows](references/advanced-workflows.md) | model queries first; `DB` for transactions; `Lock::withLock()` for locks |
-| API/web responses/resources | [responses](references/responses.md) | `JsonResource`, `ResourceCollection`, `json`, redirects, `noContent` |
+| API/web responses/resources | [responses](references/responses.md) | `JsonResource`, `ResourceCollection`, `json()`, redirects, `noContent` |
 | Blade/components/views | [views and frontend](references/views-frontend.md) | component-first UI (`<x-alert :$message type="success" />`), helpers over facades in views, layouts, `$attributes` |
-| FireLine/Inertia/Vite | [frontend setup](references/frontend-setup.md) | preserve each adapter's response protocol and asset entry |
+| FireLine/Tailwind/Alpine | [frontend setup](references/frontend-setup.md) | `tinymvc/fireline-php`, `fire()`, `Fire::render()`, `x-form`, `$form()`, `is_fire_js()` |
+| Inertia/Vite/React/Vue | [frontend setup](references/frontend-setup.md) | `tinymvc/inertia-php`, `Inertia::render()`, `inertia()`, `@inertia`, `@viteReactRefresh`, `@vite('app.tsx')` |
 | auth/gates/JWT | [auth and gate](references/auth-gate.md) | guards, `Auth`, `Gate`, `authorize`, `Gate::check()`, token lifecycle |
 | cache/locks | [cache and locks](references/cache-locks.md) | `Spark\Facades\Cache`, `Spark\Facades\Lock`, `remember`, `withLock`, invalidation |
 | jobs/queue/deferred work | [queues](references/queues.md), [concurrency](references/concurrency.md) | `JobInterface`, `Dispatchable` (`JobClass::dispatch()`), retries, idempotency |
@@ -266,14 +299,16 @@ Inspect the installed packages and existing entrypoints before choosing a fronte
 | HTTP/mail/hash/url/utils | [native feature map](references/native-feature-map.md), [mail and http](references/mail-http.md) | `Spark\Facades\Http`, `Spark\Facades\Mail`, `Spark\Facades\Hash`, `Spark\Url` |
 | providers/container/events/pipelines | [container and pipelines](references/container-pipelines.md), [extensions and errors](references/extensions-errors.md) | bind at the right lifecycle, explicit event payloads, meaningful pipelines |
 | migrations/config/bootstrap | [foundation](references/foundation.md), [migrations](references/migrations.md) | `Spark\Facades\Schema`, blueprint foreign keys (`cascadeOnDelete`), application bootstrap |
-| tests/diagnosis/upgrades | [workflow and testing](references/workflow-testing.md), [upgrades](references/upgrades.md) | test observable contracts and configured drivers |
+| tests/diagnosis/upgrades | [workflow and testing](references/workflow-testing.md), [upgrades](references/upgrades.md) | test observable contracts and configured drivers via `TestResponse` and `ApplicationTestCase` |
+
+---
 
 ## A complete feature workflow
 
 Trace one existing route → action → request → model/service → response/view path before generating files. Then:
 
 1. State the user-visible contract and frontend representation.
-2. Inspect the installed declarations and nearby code for every uncertain method.
+2. Inspect the installed declarations and nearby code for every uncertain method using `php .agents/skills/tinymvc-development/scripts/api-lookup.php <term>`.
 3. Add only the route, middleware, FormRequest, model scope/relation, resource/view, service/job, and migration pieces the feature needs.
 4. Preserve ownership, tenant boundaries, casts, loaded relations, transactions, retry behavior, and external side-effect ordering.
 5. Verify persisted state and response shape, not only a status code. Check the actual frontend protocol when an adapter is involved.
@@ -282,16 +317,17 @@ If TinyCore lacks a needed API, identify the gap and use a supported application
 
 ## Verify and hand off
 
-Run `php -l` on changed PHP files and the focused native tests (`php test --filter=Name` or `composer test`). Build frontend assets when frontend files change. For database, queue, cache, storage, driver, or HTTP lifecycle changes, test the affected configured backend and the failure/retry/ownership boundary that matters.
+Run `php -l` on changed PHP files and the focused native tests (`php test --filter=Name` or `composer test`). Build frontend assets (`npm run build`) when frontend files change. For database, queue, cache, storage, driver, or HTTP lifecycle changes, test the affected configured backend and the failure/retry/ownership boundary that matters.
 
 Before handing off, inspect the diff for:
 
 - **Dates**: strictly `now()`, `carbon()`, `Spark\Carbon`, and Carbon formatting methods; **never** `gmdate()`, `date()`, `time()`, `strtotime()`, or `microtime()`;
 - **Input as Arrayable**: passed directly to `Model::create($request->validated())`, `fill()`, `update()`, or `Auth::attempt()` without unnecessary `->all()` or `->toArray()` wrappers;
 - **Background Jobs**: dispatched statically via `JobClass::dispatch()` (with `onQueue()`, `delay()`, `dispatchOnce()`, `dispatchIf()`, etc.) and never procedural `job(JobClass::class, ...)->dispatch(...)`;
-- **Facades**: first-class `Spark\Facades\*` usage (`DB`, `Auth`, `Gate`, `Cache`, `Lock`, `Mail`, `Http`, `Storage`, `Route`, `Log`, `Blade`, `Queue`, `Schema`, `Session`, `Validator`) rather than procedural helper sprawl;
-- **Model Deletion**: using `$model->remove()` on model instances and never `$model->delete()`;
-- **Resource Controllers**: using `JsonResource` for entities/collections and `json()` only for intentional non-resource contracts;
+- **Facades**: first-class `Spark\Facades\*` usage (`DB`, `Auth`, `Gate`, `Cache`, `Lock`, `Mail`, `Http`, `Storage`, `Route`, `Log`, `Blade`, `Queue`, `Schema`, `Session`, `Validator`, `Event`) in backend PHP;
+- **Blade Views**: clean global helpers (`session()`, `auth()`, `user()`, `app()`, `now()`, `@error`, `@session`, `@auth`) rather than static facades;
+- **Model Deletion**: using `$model->remove()` on loaded model instances and never `$model->delete()`;
+- **Resource Controllers**: using `JsonResource::make()` / `JsonResource::collection()` for entities/collections and `json(['message' => '...'])` only for intentional non-resource contracts;
 - **Automatic Date Serialization in Resources**: no `Carbon::parse($model->created_at)` or manual `toIsoUtcString()` inside resources;
 - **FormRequests**: on substantial state-changing workflows;
 - **Model-First Queries**: with `->get()` (Collections) and native relations where a model exists;

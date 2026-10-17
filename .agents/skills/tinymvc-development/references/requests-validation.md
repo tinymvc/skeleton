@@ -1,6 +1,6 @@
-# Requests, Validation, and Input
+# Requests, Validation, Input, and InputErrors
 
-Read this reference for HTTP requests, form validation, FormRequest classes, and the native `Spark\Http\Input` utility. All source paths and command working directories refer to the application root.
+Read this reference for HTTP requests, form validation, FormRequest classes, and the native `Spark\Http\Input` and `Spark\Http\InputErrors` utilities in TinyMVC / TinyCore (Spark). All source paths and commands refer to the application root.
 
 ---
 
@@ -10,7 +10,7 @@ Always use dedicated **`Spark\Foundation\Http\FormRequest`** classes for resourc
 
 ### Defining a Form Request
 
-Create form requests in `app/Http/Requests`:
+Create form requests in `app/Http/Requests` (or generate via `php spark make:request StorePostRequest`):
 
 ```php
 <?php
@@ -59,7 +59,7 @@ class StorePostRequest extends FormRequest
     }
 
     /**
-     * Custom attribute names for validator error messages (optional).
+     * Custom attribute names for error messages (optional).
      */
     public function attributes(): array
     {
@@ -198,19 +198,35 @@ $strObj    = $request->validated()->str('title');             // Spark\Support\S
 $password  = $request->validated()->password('password', hash: true); // automatically bcrypt/argon2 hashed
 ```
 
-### Direct Request Utilities
+---
 
-`Spark\Http\Request` (and `FormRequest`) also exposes elegant first-class convenience methods directly:
+## Validation Errors: The `Spark\Http\InputErrors` Class
+
+When validation fails on a web request, TinyCore flashes errors to the session inside an instance of **`Spark\Http\InputErrors`**, accessible via the global `errors()` helper:
 
 ```php
-// Authenticated user and bearer token
-$user = $request->user();                    // Current authenticated Model (or null)
-$token = $request->bearerToken();            // 'Bearer eyJ...' extracted or null
+$errors = errors();
 
-// Typed request inputs with defaults
-$page = $request->integer('page', default: 1);
-$remember = $request->boolean('remember', default: false);
-$comment = $request->safe('comment', allowedTags: ['<b>', '<i>']); // Strips unwanted HTML
+if ($errors->any()) {
+    $first = $errors->first('email');      // First error message string for field
+    $allMessages = $errors->all();          // Flat array of all error messages
+    $fieldErrors = $errors->get('tags');    // Array of messages for specific field
+    $hasTitle = $errors->has('title');      // bool
+}
+```
+
+In Blade views, errors are automatically exposed via directives:
+
+```blade
+{{-- Single field error --}}
+@error('email')
+    <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
+@enderror
+
+{{-- Multiple errors for field --}}
+@errors('tags')
+    <p class="text-sm text-red-600">{{ $message }}</p>
+@enderrors
 ```
 
 ---
