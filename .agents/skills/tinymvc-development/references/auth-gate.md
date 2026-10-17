@@ -36,6 +36,10 @@ Auth::logout();
 > **Arrayable Support in `Auth::attempt`**:
 > Because `Spark\Http\Input` implements `Arrayable`, you can pass `$request->validated()` or `$request->validated()->only('email', 'password')` directly to `Auth::attempt()` without calling `->all()` or `->toArray()`.
 
+> [!IMPORTANT]
+> **Authentication & Gates in Blade Views**:
+> In Blade templates, **never call `\Spark\Facades\Auth` or `\Spark\Facades\Gate`**. Use native Blade helpers and directives: `@auth`, `@guest`, `auth()->user()`, `user('email')`, `@can('ability', $model)`, and `@cannot`.
+
 ### Custom & Named Guards
 
 In Spark 4.0, `config/auth.php` defines the default `guard`, shared `model`, and `guards` map. Named guards resolve lazily:

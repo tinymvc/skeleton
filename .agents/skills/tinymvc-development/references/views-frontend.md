@@ -1,226 +1,254 @@
-# Views Frontend
+# Views and Frontend (Blade)
 
-Contents:
+Read this reference for Blade templates, components, view helpers, and frontend integrations. All paths are relative to the application root.
 
-- [Render a view](#render-a-view)
-- [Escaped and raw output](#escaped-and-raw-output)
-- [Layouts and sections](#layouts-and-sections)
-- [Includes](#includes)
-- [Components and slots](#components-and-slots)
-- [Attribute helpers](#attribute-helpers)
-- [Control flow](#control-flow)
-- [Forms, sessions, and permissions](#forms-sessions-and-permissions)
-- [Shared data and composers](#shared-data-and-composers)
-- [Custom directives and template paths](#custom-directives-and-template-paths)
-- [Compiled templates](#compiled-templates)
-- [Empty lists and compiler boundaries](#empty-lists-and-compiler-boundaries)
-- [Frontend Integrations](#frontend-integrations)
+---
 
-Read this reference for views, frontend integrations. Source paths and command working directories refer to the application root unless explicitly stated otherwise. Check the installed package when versions differ.
+## 1. Modern Component-First UI (`<x-component>`)
 
-## Render a view
+> [!IMPORTANT]
+> **Component-First Standard**:
+> Always use Blade components (`<x-component ...>`) for reusable UI elements (alerts, buttons, cards, modals, navigation, form inputs).
+> **Never use `@include('partials.alert')` for UI components.** Reserve `@include` strictly for non-componentized document sections or large email template pieces.
 
-Templates live under `resources/views` by default, configured by `app.views_dir`. Dot notation maps to directories:
+### Defining Components
 
-```php
-return view('posts.index', ['posts' => $posts]);
+Component templates live in `resources/views/components/`. Use `@props` for declared data and `$attributes` for remaining HTML attributes:
+
+```blade
+{{-- resources/views/components/alert.blade.php --}}
+@props([
+    'type' => 'info',
+    'message' => null,
+])
+
+<div {{ $attributes->merge(['class' => 'alert alert-' . $type]) }} role="alert">
+    {{ $message ?? $slot }}
+</div>
 ```
 
-This renders `resources/views/posts/index.blade.php` into a response. `blade()->render('posts.index', $data)` renders a string. Generate files with `php spark make:view posts.index` and components with `php spark make:component alert`.
+```blade
+{{-- resources/views/components/button.blade.php --}}
+@props(['type' => 'button', 'variant' => 'primary'])
 
-## Escaped and raw output
-
-```html
-<h1>{{ $title }}</h1>
-{!! $trustedHtml !!}
-{{-- This comment is removed during compilation. --}}
+<button type="{{ $type }}" {{ $attributes->class(['btn', 'btn-' . $variant => $variant]) }}>
+    {{ $slot }}
+</button>
 ```
 
-Use escaped `{{ }}` for user data. Raw output is for trusted HTML. `@json($value)` uses the framework's JavaScript encoder when embedding data in scripts. `@verbatim ... @endverbatim` preserves text that would otherwise be compiled.
+```blade
+{{-- resources/views/components/forms/input.blade.php --}}
+@props([
+    'name',
+    'label' => null,
+    'type' => 'text',
+    'value' => null,
+])
 
-## Layouts and sections
+<div>
+    @if($label)
+        <label for="{{ $name }}" class="block text-sm font-medium mb-1">{{ $label }}</label>
+    @endif
+    <input
+        type="{{ $type }}"
+        name="{{ $name }}"
+        id="{{ $name }}"
+        value="{{ old($name, $value) }}"
+        {{ $attributes->merge(['class' => 'form-input w-full rounded border-gray-300']) }}
+    >
+    @error($name)
+        <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
+    @enderror
+</div>
+```
 
-Create `layouts/app.blade.php`:
+### Using Components in Views
 
-```html
+TinyCore supports clean, expressive component syntax:
+
+```blade
+{{-- 1. Variable prop shorthand (:$message is identical to :message="$message") --}}
+<x-alert :$message type="success" />
+
+{{-- 2. Explicit bound expression (:message) for custom variables or expressions --}}
+<x-alert :message="$errorMessage" type="warning" class="mb-4" />
+
+{{-- 3. Block component with slot content ($slot) --}}
+<x-alert type="danger">
+    <strong>Error!</strong> Could not connect to payment gateway.
+</x-alert>
+
+{{-- 4. Nested components via dot notation (components/forms/input.blade.php) --}}
+<x-forms.input name="email" label="Email Address" type="email" required />
+
+{{-- 5. Action buttons --}}
+<x-button type="submit" variant="primary">Save Changes</x-button>
+```
+
+### Component Attributes (`Spark\View\Attributes`)
+
+Inside component templates, `$attributes` provides powerful fluent helpers:
+* `$attributes->merge(['class' => 'default-class'])`: Merges defaults with consumer-provided attributes without clobbering.
+* `$attributes->class(['base', 'active' => $isActive])`: Conditionally compiles class strings.
+* `$attributes->has('id')`: Checks if an attribute exists.
+* `$attributes->get('name', 'default')`: Reads attribute value.
+* `$attributes->except('class')`: Excludes attributes.
+
+---
+
+## 2. Helpers vs. Facades in Blade Views
+
+> [!CAUTION]
+> **Strict Rule: Never Use Static Facades in Blade Views!**
+> Do **NOT** use `\Spark\Facades\*` (e.g. `\Spark\Facades\Session`, `\Spark\Facades\Auth`, `\Spark\Facades\App`) inside Blade templates.
+> In views, **always use native Spark global helpers and directives**.
+
+| Purpose | Non-Smart / Banned in Blade ❌ | Smart & Idiomatic in Blade ✅ |
+| --- | --- | --- |
+| **Session Flash** | `\Spark\Facades\Session::get('status')` | `session('status')` or `@session('status') {{ $value }} @endsession` |
+| **Session Check** | `\Spark\Facades\Session::has('error')` | `session()->has('error')` |
+| **Auth User** | `\Spark\Facades\Auth::user()` | `auth()->user()` or `user()` or `user('email')` |
+| **Auth Check** | `\Spark\Facades\Auth::check()` | `@auth ... @endauth` or `@guest ... @endguest` |
+| **App / Services** | `\Spark\Facades\App::make('cache')` | `app('cache')` or `app(SomeService::class)` |
+| **Config Value** | `\Spark\Facades\Config::get('app.name')` | `config('app.name')` |
+| **Current Request** | `\Spark\Facades\Request::input('q')` | `request('q')` |
+| **Route URL** | `\Spark\Facades\Route::url(...)` | `route('posts.show', $post->slug)` |
+| **Current Time** | `\Spark\Facades\Date::now()` or `date()` | `now()->year` or `today()->toDateString()` |
+| **CSRF Token** | `\Spark\Facades\Session::token()` | `@csrf` or `csrf_token()` or `csrf_field()` |
+| **Authorization** | `\Spark\Facades\Gate::allows(...)` | `@can('update-post', $post) ... @endcan` or `@cannot` |
+
+### Blade Helper Example
+
+```blade
+@auth
+    <span>Welcome back, {{ user('name') }}!</span>
+@endauth
+
+@session('status')
+    <x-alert :message="session('status')" type="success" />
+@endsession
+
+<form method="POST" action="{{ route('posts.store') }}">
+    @csrf
+    <x-forms.input name="title" :value="old('title')" placeholder="Post title" />
+    @error('title')
+        <p class="text-red-500">{{ $message }}</p>
+    @enderror
+
+    <x-button type="submit">Publish</x-button>
+</form>
+```
+
+---
+
+## 3. Layouts: Components vs. Sections
+
+### Component-Based Layouts (Recommended)
+
+Create `resources/views/components/layout.blade.php`:
+
+```blade
+@props(['title' => config('app.name')])
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@yield('title', 'My application')</title>
-    @vite('app.js')
+    <title>{{ $title }}</title>
+    @vite('resources/css/app.css')
 </head>
-<body>
-    @include('partials.navigation')
-    <main>@yield('content')</main>
+<body class="bg-gray-50 text-gray-900">
+    <x-navigation />
+    <main class="container mx-auto px-4 py-8">
+        {{ $slot }}
+    </main>
 </body>
 </html>
 ```
 
-A page extends it:
+Use in a page view:
 
-```html
+```blade
+<x-layout title="All Posts">
+    <h1 class="text-2xl font-bold mb-4">Blog Posts</h1>
+    <div class="grid gap-4">
+        @foreach($posts as $post)
+            <x-card :title="$post->title">
+                <p>{{ $post->excerpt }}</p>
+            </x-card>
+        @endforeach
+    </div>
+</x-layout>
+```
+
+### Classic Section Layouts (`@extends`)
+
+```blade
+{{-- layouts/app.blade.php --}}
+<!doctype html>
+<html>
+<head>
+    <title>@yield('title', config('app.name'))</title>
+</head>
+<body>
+    <x-navigation />
+    <main>@yield('content')</main>
+</body>
+</html>
+
+{{-- posts/index.blade.php --}}
 @extends('layouts.app')
 @section('title', 'Posts')
 
 @section('content')
     <h1>Posts</h1>
-    @foreach($posts as $post)
-        <article><h2>{{ $post->title }}</h2></article>
-    @endforeach
 @endsection
 ```
 
-`@stop` aliases `@endsection`; `@show` ends and immediately yields a section. `@hasSection()` and `@sectionMissing()` check whether a section exists. `@yield()` can provide a default.
+---
 
-## Includes
+## 4. When to Use `@include`
 
-`@include('partials.header', ['title' => $title])` renders a partial with data. Use `@includeIf()` for an optional template, `@includeWhen($condition, 'view', $data)` for a conditional include, and `@includeUnless()` for the inverse.
+Reserve `@include()` **only** for:
+- Large static document sections (e.g. `@include('legal.terms-of-service-body')`).
+- Multi-section email templates (e.g. `@include('emails.partials.footer')`).
+- Never use `@include` for reusable interactive widgets; use `<x-component>` instead.
 
-Keep partials focused on presentation. Fetch shared data in a composer or provider instead of querying a database in a loop inside a template.
+---
 
-## Components and slots
+## 5. Directives and Control Flow Reference
 
-Create `components/notice.blade.php`:
-
-```html
-@props(['tone' => 'info'])
-<div {{ $attributes->merge(['class' => 'notice']) }}>
-    <strong>{{ $tone }}</strong>
-    {!! $slot !!}
-</div>
-```
-
-Use it in a page:
-
-```html
-<x-notice tone="success" class="mt-4">
-    <p>Your changes have been saved.</p>
-</x-notice>
-```
-
-`<x-name />` creates a self-closing component. Prefix an attribute with `:` to evaluate PHP, as in `:message="$message"`; shorthand `:$user` passes a same-named variable. Slot content is rendered HTML. Dynamic slot closures currently do not capture the parent template’s local variables. Pass dynamic data as component props and render it inside the component, rather than reading parent-local variables inside a slot. Component attributes are represented by `Spark\View\Attributes`.
-
-## Attribute helpers
-
-`$attributes->get()`, `has()`, `hasAny()`, `only()`, `except()`, `filter()`, and prefix filters select attributes. `merge()`, `class()`, and `style()` combine defaults and conditional values. `props()` extracts component props; `toHtml()` serializes attributes.
-
-Template directives also support `@class()`, `@style()`, `@attributes()`, and boolean attributes `@checked()`, `@selected()`, `@disabled()`, `@readonly()`, and `@required()`.
-
-```html
-<input type="checkbox" name="published" @checked($post->published)>
-```
-
-## Control flow
-
-| Purpose | Directives |
+| Directive | Purpose |
 | --- | --- |
-| Conditions | `@if`, `@elseif`, `@else`, `@endif` |
-| Inverse condition | `@unless`, `@endunless` |
-| Presence | `@isset`, `@endisset`, `@empty`, `@endempty` |
-| Loops | `@foreach` / `@endforeach`, `@for` / `@endfor`, `@while` / `@endwhile` |
-| Loop control | `@continue`, `@break` |
-| Branching | `@switch`, `@case`, `@default`, `@endswitch` |
-| PHP | `@php` / `@endphp`, `@use('Namespace\\Class')` |
+| `@if`, `@elseif`, `@else`, `@endif` | Conditional blocks |
+| `@unless`, `@endunless` | Inverse condition |
+| `@isset`, `@empty` | Presence / emptiness checks |
+| `@foreach`, `@for`, `@while` | Loops |
+| `@class([...])` | Conditional CSS class string |
+| `@checked($bool)`, `@selected($bool)` | HTML input state attributes |
+| `@disabled($bool)`, `@readonly($bool)`, `@required($bool)` | Form input attributes |
+| `@csrf`, `@method('PUT')` | Form security & HTTP spoofing |
+| `@error('field') ... @enderror` | Validation error block exposing `$message` |
+| `@session('key') ... @endsession` | Session presence block |
+| `@auth($guard)`, `@guest($guard)` | Authentication state blocks |
+| `@can('ability', $model)`, `@cannot` | Authorization gate checks |
+| `@json($data)` | Safe JavaScript encoding |
+| `@verbatim ... @endverbatim` | Preserves raw Vue/Alpine markup |
 
-This is TinyCore's own compiler. Do not assume directives from another Blade implementation are supported unless registered by an integration.
+---
 
-## Forms, sessions, and permissions
-
-| Purpose | Directives |
-| --- | --- |
-| Form protection | `@csrf`, `@method('PATCH')` |
-| Old input | `@old('name')` |
-| Validation | `@error('email')` / `@enderror`, `@errors('email')` / `@enderrors` |
-| Authentication | `@auth` / `@endauth`, `@guest` / `@endguest` |
-| Authorization | `@can(...)` / `@endcan`, `@cannot(...)` / `@endcannot`, `@authorize(...)` |
-| Session presence | `@session('message')` / `@endsession` |
-| Debugging | `@dump(...)`, `@dd(...)`, `@abort(...)` |
-
-Validation blocks expose `$message`. Permission-based UI is a convenience: enforce the same rule in the controller or middleware. See [Authorization](auth-gate.md) for argument handling.
-
-Authentication directives also accept a registered guard name:
-
-```blade
-@auth('admin')
-    <p>Signed in as {{ user('email', '', guard: 'admin') }}</p>
-@endauth
-
-@guest('admin')
-    <a href="{{ route('admin.login') }}">Admin sign in</a>
-@endguest
-```
-
-Without an argument, `@auth` and `@guest` use the default guard. These directives call `is_logged($guard)` and `is_guest($guard)`; they do not switch the identity used by an unqualified `user()` call inside the block. Register guards as shown in [Authentication](auth-gate.md) and enforce access on the route too.
-
-## Shared data and composers
-
-Register shared values and composers in a provider's `boot()` method:
+## 6. Rendering from Controllers & Clearing Cache
 
 ```php
-use Spark\Facades\Blade;
+// Return View Response
+return view('posts.show', compact('post'));
 
-Blade::share('siteName', config('app.name'));
-Blade::composer('partials.navigation', function ($view) {
-    $view->share('currentUser', user());
-});
+// Render HTML String
+$html = blade()->render('emails.welcome', compact('user'));
 ```
 
-Templates also have application context such as `$app`, `$request`, `$session`, and `$errors`. `@share()` shares a value from a template. Prefer explicit page data when global state would make templates difficult to reason about.
-
-## Custom directives and template paths
-
-```php
-use Spark\Facades\Blade;
-
-Blade::directive('year', function ($expression) {
-    return '<?php echo now()->year; ?>';
-});
-```
-
-A directive callback returns generated PHP; it does not render a request value immediately. Treat directive definitions as application code. Additional view locations can be registered through `setUsePath()` / `usePath()`; `templateExists()` checks resolution.
-
-## Compiled templates
-
-The engine compiles templates to its cache directory. Clear compiled views after changing directives or troubleshooting stale markup:
+Clear compiled templates after modifying directives or layouts:
 
 ```bash
 php spark view:clear
 ```
-
-For asset loading, use the application’s Vite configuration and `@vite` entry points. For dynamic navigation over Blade responses, see [FireLine](https://tinymvc.github.io/fireline).
-
-## Empty lists and compiler boundaries
-
-Use an explicit empty-state condition around a normal loop:
-
-```html
-@if(empty($posts))
-    <p>No posts have been published yet.</p>
-@else
-    @foreach($posts as $post)
-        <h2>{{ $post->title }}</h2>
-    @endforeach
-@endif
-```
-
-This example expects an array; for a Collection use `$posts->isEmpty()`. The current compiler does not provide `@forelse`, `$loop` metadata, `@push` / `@stack`, or Laravel class-based/named-slot component behavior. Use the documented sections, includes, default component slot, and explicitly passed data instead of assuming unsupported syntax will compile.
-
-Component prop values and HTML attributes have different jobs. Extract declared props with `@props`, keep additional HTML attributes in `$attributes`, and render untrusted text through escaped output inside the component. Clear compiled views after changing a custom directive because an unchanged template file may otherwise keep its earlier compiled code.
-
-## Frontend Integrations
-
-For setup, version selection, Vite entries, provider/middleware registration, and response contracts, read [Frontend setup](frontend-setup.md).
-
-Inspect `package.json`, `vite.config.js`, existing templates/pages, and registered providers before choosing an approach. The skeleton uses Vite, Tailwind, Alpine, and Blade; optional packages may add different capabilities.
-
-| Existing stack | Development approach |
-| --- | --- |
-| Blade + Alpine | Server-rendered views with targeted browser interactions; preserve CSRF form handling |
-| FireLine | Follow the installed integration's navigation/form conventions and current app templates |
-| Inertia PHP + React/Vue | Verify the adapter/provider and matching client version, then return the app's existing Inertia responses |
-| Orbit | Extend its existing administration resources, BREAD, access rules, and React/shadcn components rather than creating a parallel admin architecture |
-
-`Route::inertia()` needs the adapter service provider; a route method name alone does not install the integration. Inspect the installed package README/source for version-sensitive props and APIs. Do not add FireLine, Inertia, React, Vue, or Orbit unless the app/task calls for that integration. Use the app's Vite asset helper and build configuration instead of hardcoded development-server URLs.
-

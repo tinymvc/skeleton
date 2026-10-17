@@ -38,6 +38,10 @@ Always write smart, elegant, and native Spark syntax. Compare standard patterns 
 | **Cache Storing** | `if (!Cache::has($k)) { Cache::put($k, ...); }` | `Cache::remember('key', fn () => ..., '+1 hour')` |
 | **Collections** | `$users->map(fn ($u) => $u->title)` | `$users->map->title` *(Higher-Order Proxy)* |
 | **Collection Filtering**| `$users->filter(fn ($u) => $u->is_active)` | `$users->filter->is_active` *(Higher-Order Proxy)* |
+| **Blade UI Components** | `@include('partials.alert', ['message' => $msg])` | `<x-alert :$message type="success" />` or `<x-alert :message="$msg" />` |
+| **Blade Session Access**| `\Spark\Facades\Session::get('status')` | `session('status')` or `@session('status')` |
+| **Blade Auth User** | `\Spark\Facades\Auth::user()` | `auth()->user()` or `user()` or `@auth` |
+| **Blade Service Access**| `\Spark\Facades\App::make('service')` | `app('service_alias')` or `app(Class::class)` |
 | **JSON Resources** | `json(['data' => $post])` or manual `Carbon::parse()` | `PostResource::make($post)` *(Dates auto-converted to ISO UTC)* |
 | **Outbound HTTP** | `curl_init()` or `file_get_contents()` | `Http::withToken($token)->post($url, $payload)` |
 | **Environment Check** | `getenv('APP_ENV') === 'testing'` | `App::isTesting()` or `App::isDebugMode()` |
@@ -144,9 +148,9 @@ ProcessPayment::dispatchSync($order->id);
 
 **Never use `job(JobClass::class, [...])->dispatch(...)` or procedural `dispatch(...)`** in application domain logic. The `job()` helper is reserved strictly for recurring queue registration in `bootstrap/app.php` (`withQueue(jobs: [...])`) or raw closure callbacks.
 
-### 5. Use native static facades (`Spark\Facades\*`)
+### 5. Use native static facades (`Spark\Facades\*`) in backend PHP
 
-TinyCore provides first-class static facades under `Spark\Facades\*`. Always prefer facades over procedural global helpers for core services:
+TinyCore provides first-class static facades under `Spark\Facades\*`. In backend PHP classes (controllers, services, jobs, models, middleware, commands), always prefer facades over procedural global helpers for core services:
 - **Database (`DB`)**: `DB::transaction(fn() => ...)`, `DB::table('users')`, `DB::raw(...)`.
 - **Auth (`Auth`)**: `Auth::check()`, `Auth::user()`, `Auth::id()`, `Auth::attempt(...)`, `Auth::loginUsingId($id)`.
 - **Gate (`Gate`)**: `Gate::define(...)`, `Gate::check(...)`, `Gate::allows(...)`, `Gate::denies(...)`, `Gate::authorize(...)`.
@@ -163,7 +167,18 @@ TinyCore provides first-class static facades under `Spark\Facades\*`. Always pre
 - **Hash (`Hash`)**: `Hash::make('password')`, `Hash::check('password', $hash)`.
 - **Route (`Route`)**: `Route::get(...)`, `Route::post(...)`, `Route::resource(...)`, `Route::group(...)`.
 
-### 6. Use the ORM for domain entities
+> [!CAUTION]
+> **Never use static facades inside Blade templates!**
+> Facades belong in backend PHP classes. Inside `.blade.php` views, always use Spark's expressive global helpers (`session()`, `auth()`, `user()`, `app()`, `route()`, `old()`, `now()`).
+
+### 6. Blade components over partials; helpers over facades in views
+
+- **Component-First UI**: Always build reusable UI elements (alerts, buttons, cards, modals, form inputs) as Blade components in `resources/views/components/` and invoke them with `<x-component ...>` tags.
+- **Smart Syntax**: Pass variables directly via shorthand `<x-alert :$message type="success" />` or bound expression `<x-alert :message="$msg" type="success" />`. Pass child markup into the default `$slot` (`<x-card>Content</x-card>`). Use dot notation for nested directories: `<x-forms.input name="email" :value="old('email')" />` maps to `resources/views/components/forms/input.blade.php`.
+- **Ban `@include('partials...')` for UI components**: Reserve `@include()` solely for large static document sections or email templates.
+- **Strictly Global Helpers in Blade**: In templates, use `session('status')`, `old('email')`, `auth()->user()`, `user()`, `app('alias')`, `route('posts.show', $post->slug)`, `now()`. Never reference `\Spark\Facades\*` inside Blade templates.
+
+### 7. Use the ORM for domain entities
 
 When an application model exists, start with `Post::query()`, `Post::where(...)`, `Post::findOrFail(...)`, `Post::create(...)`, or a model scope. Define and use Spark relations (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`, `hasManyThrough`) with `with()`, `load()`, `whereHas()`, `whereDoesntHave()`, `whereRelation()`, and relation aggregates before considering SQL joins.
 
@@ -174,7 +189,7 @@ Remember the installed return contracts:
 - `save()` and `remove()` return `bool`. A loaded model instance is deleted with **`$model->remove()`** (never `$model->delete()`).
 - Query `update()` and `delete()` return affected-row counts.
 
-### 7. Collection-first queries, pivot relations, and model events
+### 8. Collection-first queries, pivot relations, and model events
 
 - **Collection-First**: Default query execution should use `->get()` (which returns a `Spark\Support\Collection`) or `->paginate($limit)` (which returns a `Spark\Utils\Paginator`) rather than `->all()` (which returns a raw PHP array). Collections provide higher-order operations: `map()`, `filter()`, `pluck()`, `keyBy()`, `first()`.
 - **Pivot Relations**: Manage `belongsToMany` pivots using native methods: `$model->tags()->attach([1, 2])`, `$model->tags()->detach([1])`, `$model->tags()->sync([2, 3])`, `$model->tags()->toggle([1])`.
@@ -190,7 +205,7 @@ Remember the installed return contracts:
   }
   ```
 
-### 8. Fluent migrations with foreign key constraints
+### 9. Fluent migrations with foreign key constraints
 
 Use Spark's expressive foreign key constraint methods on blueprints:
 
@@ -211,17 +226,17 @@ Schema::create('posts', function (Blueprint $table) {
 
 Constraint methods on `foreignId`: `cascadeOnDelete()`, `cascadeOnUpdate()`, `setNullOnDelete()`, `setNullOnUpdate()`, `restrictOnDelete()`, `restrictOnUpdate()`, `noActionOnDelete()`, `noActionOnUpdate()`.
 
-### 9. Keep controllers thin and services purposeful
+### 10. Keep controllers thin and services purposeful
 
 Controllers coordinate route/request/model/service/response work. Keep query composition close to models as scopes and relations. Put multi-step domain workflows, transactions, external effects, cache invalidation, file operations, or reusable business rules in focused `app/Services/*Service` classes. Do not create repositories, service layers, DTOs, or pipelines for a one-line operation; do create a service when it gives a stable responsibility and a testable boundary.
 
 Prefer constructor or action injection through the Spark container. Do not capture a current request, user, tenant, PDO connection, or open transaction in a singleton or queued job. Use jobs for durable work, `defer()` only for small process-local post-response work, `Spark\Concurrency` for independent bounded tasks, and `Spark\Console\Process` for bounded subprocesses.
 
-### 10. Use route model binding when the contract fits
+### 11. Use route model binding when the contract fits
 
 Define `{post}` or `{post:slug}` and type-hint `Post $post` in the action. Spark resolves the model with `firstOrFail()` before invocation. Keep parameter names aligned. Use an explicit query/service when lookup needs ownership, compound conditions, trash visibility, or a non-model result; binding alone never proves authorization.
 
-### 11. Follow the local style
+### 12. Follow the local style
 
 - Four spaces, no tabs; class and method braces on the next line; braces for all control flow.
 - One statement per line, descriptive names, explicit visibility and types where the real contract permits.
@@ -242,7 +257,7 @@ Inspect the installed packages and existing entrypoints before choosing a fronte
 | models/ORM/soft deletes | [models and relations](references/models-relations.md), [soft deletes](references/soft-deletes.md) | casts, scopes, relations, `with*`, `whereHas*`, `remove()`, events |
 | SQL/transactions/locks | [queries](references/queries.md), [advanced workflows](references/advanced-workflows.md) | model queries first; `DB` for transactions; `Lock::withLock()` for locks |
 | API/web responses/resources | [responses](references/responses.md) | `JsonResource`, `ResourceCollection`, `json`, redirects, `noContent` |
-| Blade/components/directives | [views and frontend](references/views-frontend.md) | `Spark\Facades\Blade` directives, components, and escaped output |
+| Blade/components/views | [views and frontend](references/views-frontend.md) | component-first UI (`<x-alert :$message type="success" />`), helpers over facades in views, layouts, `$attributes` |
 | FireLine/Inertia/Vite | [frontend setup](references/frontend-setup.md) | preserve each adapter's response protocol and asset entry |
 | auth/gates/JWT | [auth and gate](references/auth-gate.md) | guards, `Auth`, `Gate`, `authorize`, `Gate::check()`, token lifecycle |
 | cache/locks | [cache and locks](references/cache-locks.md) | `Spark\Facades\Cache`, `Spark\Facades\Lock`, `remember`, `withLock`, invalidation |

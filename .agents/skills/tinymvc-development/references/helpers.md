@@ -29,6 +29,11 @@ TinyCore provides first-class static facades under `Spark\Facades\*`. They provi
 | `Spark\Facades\Storage` | `Spark\Storage\Storage` | Filesystem storage (`Storage::disk('public')->put()`, `Storage::url()`). |
 | `Spark\Facades\Validator` | `Spark\Http\Validator` | Explicit validator construction (`Validator::make($rules, $data)`). |
 
+> [!IMPORTANT]
+> **Facades in Backend PHP vs. Global Helpers in Blade Views**:
+> Static facades (`Spark\Facades\*`) are designed for backend PHP classes (controllers, services, jobs, models, commands).
+> **Never use static facades inside Blade templates (`.blade.php`)**. In Blade views, always use Spark's expressive global helpers (`session()`, `auth()`, `user()`, `app()`, `request()`, `route()`, `old()`, `csrf_field()`, `now()`).
+
 ### Facade Code Examples
 
 ```php

@@ -35,6 +35,20 @@ Session::flash('status', 'Your profile was updated successfully!');
 $status = Session::getFlash('status'); // Retrieves and clears
 ```
 
+### Session Access in Blade Views
+
+In Blade templates, **never use `\Spark\Facades\Session`**. Always use the `session()` helper or `@session` directive:
+
+```blade
+{{-- Flash message alert --}}
+@session('status')
+    <x-alert :message="session('status')" type="success" />
+@endsession
+
+{{-- Reading session values --}}
+<p>Selected theme: {{ session('theme', 'light') }}</p>
+```
+
 ---
 
 ## Cookies with `now()`
