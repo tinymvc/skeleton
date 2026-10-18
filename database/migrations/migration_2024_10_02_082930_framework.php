@@ -13,15 +13,17 @@ return new class {
         });
 
         Schema::create('caches', function (Blueprint $table) {
-            $table->string('key')->primary();
-            $table->string('group')->nullable()->index();
+            $table->string('key')->charset('binary')->collation('binary');
+            $table->string('group')->charset('binary')->collation('binary')->default('default');
             $table->longText('data');
             $table->bigInteger('expiration')->default(0)->index();
+
+            $table->primary(['group', 'key']);
         });
 
         Schema::create('locks', function (Blueprint $table) {
-            $table->string('key')->primary()->unique();
-            $table->string('owner')->index();
+            $table->string('key')->charset('binary')->collation('binary')->primary();
+            $table->string('owner')->charset('binary')->collation('binary')->index();
             $table->bigInteger('expiration')->index();
         });
 
