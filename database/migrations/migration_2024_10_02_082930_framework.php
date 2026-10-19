@@ -13,17 +13,16 @@ return new class {
         });
 
         Schema::create('caches', function (Blueprint $table) {
-            $table->string('key')->charset('binary')->collation('binary');
-            $table->string('group')->charset('binary')->collation('binary')->default('default');
+            $table->string('key');
+            $table->string('group');
             $table->longText('data');
             $table->bigInteger('expiration')->default(0)->index();
-
-            $table->primary(['group', 'key']);
+            $table->primary(['group', 'key']); // Composite primary key for group and key
         });
 
         Schema::create('locks', function (Blueprint $table) {
-            $table->string('key')->charset('binary')->collation('binary')->primary();
-            $table->string('owner')->charset('binary')->collation('binary')->index();
+            $table->string('key')->primary();
+            $table->string('owner')->index();
             $table->bigInteger('expiration')->index();
         });
 

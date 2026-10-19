@@ -1,6 +1,6 @@
 # TinyMVC / Spark application development
 
-For TinyMVC / Spark implementation, debugging, review, or test work, use the local [tinymvc-spark skill](.agents/skills/tinymvc-spark/SKILL.md). It selects focused references within the skill; read only the topics needed for the task.
+For TinyMVC / Spark implementation, debugging, review, or test work, use the local [tinymvc-spark skill entry point](.agents/skills/tinymvc-spark/SKILL.md). It loads the versioned skill from `vendor/tinymvc/tinycore/skills/tinymvc-spark/SKILL.md`; read only the topics needed for the task. Framework guidance is maintained in TinyCore and arrives with Composer dependency updates.
 
 Understand the framework architecture roles: `tinymvc` is the vendor; `tinymvc/spark` (Spark) is the root framework (using the `Spark\` PHP namespace alias, Spark facades, and `php spark` CLI runner); `tinymvc/tinycore` (TinyCore) is the core framework engine provided by TinyMVC; and `tinymvc/skeleton` (Skeleton) is the application boilerplate.
 
