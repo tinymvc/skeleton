@@ -11,8 +11,6 @@
  * @module aap
  */
 
-import "./app.css";
-
 import Alpine from "alpinejs";
 
 import axios from "axios";
