@@ -13,37 +13,36 @@ const cors = ({ appUrl }) => ({
   ],
 });
 
-export default defineConfig(({ mode }) => {
+const viteAppUrl = (mode) => {
   const env = loadEnv(mode, __dirname); // default prefix = VITE_ only
-  const appUrl = env.VITE_APP_URL || "http://localhost:8080";
-  const base = mode === "production" ? "/build/" : "/";
+  return env.VITE_APP_URL || "http://localhost:8080";
+};
 
-  return {
-    plugins: [tailwindcss(), fullReload(["./resources/views/**/*.blade.php"])],
-    base: base,
-    root: resolvePath("./resources/app"),
-    envDir: __dirname, // frontend import.meta.env reads .env from project root
-    server: {
-      strictPort: true,
-      port: 5173,
-      origin: "http://localhost:5173",
-      cors: cors({ appUrl }),
+export default defineConfig(({ mode }) => ({
+  plugins: [tailwindcss(), fullReload(["./resources/views/**/*.blade.php"])],
+  root: resolvePath("./resources/app"),
+  server: {
+    strictPort: true,
+    port: 5173,
+    origin: "http://localhost:5173",
+    cors: cors({ appUrl: viteAppUrl(mode) }),
+  },
+  build: {
+    outDir: resolvePath("./public/build"),
+    emptyOutDir: true,
+    manifest: true,
+    rollupOptions: {
+      input: [
+        resolvePath("./resources/app/app.js"),
+        resolvePath("./resources/app/app.css"),
+      ],
     },
-    build: {
-      outDir: resolvePath("./public/build"),
-      emptyOutDir: true,
-      manifest: true,
-      rollupOptions: {
-        input: [
-          resolvePath("./resources/app/app.js"),
-          resolvePath("./resources/app/app.css"),
-        ],
-      },
+  },
+  resolve: {
+    alias: {
+      "@": resolvePath("./resources/app"),
     },
-    resolve: {
-      alias: {
-        "@": resolvePath("./resources/app"),
-      },
-    },
-  };
-});
+  },
+  base: mode === "production" ? "/build/" : "/",
+  envDir: __dirname, // frontend import.meta.env reads .env from project root
+}));
