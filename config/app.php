@@ -12,12 +12,12 @@ return [
     // Directory paths
     'storage_dir' => dirname(__DIR__) . '/storage', // Storage directory
     'temp_dir' => dirname(__DIR__) . '/storage/framework/temp', // Temporary files directory
-    'upload_dir' => dirname(__DIR__) . '/storage/app/public', // Public upload directory
+    'upload_dir' => dirname(__DIR__) . '/storage/app/public', // Public upload directory (Global support)
     'views_dir' => dirname(__DIR__) . '/resources/views', // Template directory
     'locale_dir' => dirname(__DIR__) . '/resources/languages', // Language files directory
 
     // URL settings
-    'media_url' => '/uploads/', // Media URL
+    'media_url' => '/uploads/', // Media URL (Global support)
     'asset_url' => '/assets/', // Asset URL
 
     // Trusted proxy IPs/CIDRs, e.g. ['10.0.0.0/8', '172.16.0.0/12', '127.0.0.1'].

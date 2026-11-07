@@ -4,7 +4,7 @@
 .codex
 .idea
 .DS_Store
-vendor
+/vendor
 node_modules
 composer.lock
 package-lock.json
