@@ -31,6 +31,9 @@
         "ext-redis": "Required for Redis cache, lock, session, and queue drivers."
     },
     "scripts": {
+        "post-autoload-dump": [
+            "@php spark package:discover"
+        ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],

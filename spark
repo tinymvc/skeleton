@@ -11,7 +11,8 @@ require $autoload; // Load the Composer autoloader for the application
 
 /** @var Spark\Foundation\Application $app */
 $app = require_once __DIR__ . '/bootstrap/app.php';
-$app->registerConsoleServices();
+
+$app->withConsoleServices();
 $app->withCommands(
     load: __DIR__ . '/routes/console.php'
 );
