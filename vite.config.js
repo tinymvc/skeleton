@@ -5,7 +5,7 @@ import fullReload from "vite-plugin-full-reload";
 
 const resolvePath = (relativePath) => path.resolve(__dirname, relativePath);
 
-const cors = ({ appUrl }) => ({
+const cors = (appUrl) => ({
   origin: [
     appUrl.replace(/\/+$/, ""),
     /^https?:\/\/([\w-]+\.)*test(:\d+)?$/, // any Herd *.test site
@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => ({
     strictPort: true,
     port: 5173,
     origin: "http://localhost:5173",
-    cors: cors({ appUrl: viteAppUrl(mode) }),
+    cors: cors(viteAppUrl(mode)),
   },
   build: {
     outDir: resolvePath("./public/build"),

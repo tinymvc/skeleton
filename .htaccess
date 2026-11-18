@@ -1,9 +1,21 @@
 <IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
     RewriteEngine On
 
     # Block Git repository metadata.
     RewriteRule (^|/)\.git(/|$) - [F,L,NC]
 
-    # Route all requests through public/.
+    RewriteRule ^(?:app|bootstrap|config|database|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+    RewriteRule ^(?:\.env|\.env\..*|composer\.(?:json|lock)|package(?:-lock)?\.json|vite\.config\.js|spark|README\.md)$ - [F,L]
+
+    RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -f [OR]
+    RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -d
     RewriteRule ^(.*)$ public/$1 [L]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ public/index.php [L]
 </IfModule>

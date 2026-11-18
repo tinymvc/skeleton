@@ -3,6 +3,7 @@
 return [
     'key' => env('APP_KEY'), // Application key for encryption
     'debug' => env('APP_DEBUG', true), // Enable or disable debug mode
+    'env' => env('APP_ENV', 'production'), // Application environment
 
     'name' => env('APP_NAME', 'Spark'), // Application name
     'timezone' => env('APP_TIMEZONE', 'UTC'), // Application timezone

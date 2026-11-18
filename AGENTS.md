@@ -1,11 +1,47 @@
-# TinyMVC / Spark application development
+<tinymvc-ember-guidelines>
+# TinyMVC Application
 
-For TinyMVC / Spark implementation, debugging, review, or test work, use the local [tinymvc-spark skill entry point](.agents/skills/tinymvc-spark/SKILL.md). It loads the versioned skill from `vendor/tinymvc/tinycore/skills/tinymvc-spark/SKILL.md`; read only the topics needed for the task. Framework guidance is maintained in TinyCore and arrives with Composer dependency updates.
+This repository contains a TinyMVC / Spark application. Complete the following setup before working on the user's request.
 
-Understand the framework architecture roles: `tinymvc` is the vendor; `tinymvc/spark` (Spark) is the root framework (using the `Spark\` PHP namespace alias, Spark facades, and `php spark` CLI runner); `tinymvc/tinycore` (TinyCore) is the core framework engine provided by TinyMVC; and `tinymvc/skeleton` (Skeleton) is the application boilerplate.
+## Prerequisites
 
-Write clean, spacious Laravel-style PHP using Spark-native features first. Follow the skill’s required coding style: four-space indentation, one statement per line, deliberate blank lines, and readable multiline chains and arrays. Laravel-style formatting does not imply Laravel API compatibility. For feature design, the skill links to portable application examples: direct controllers, focused domain services, model scopes, and explicit resources. Follow the target application’s nearby conventions when choosing among these patterns.
+Verify that PHP and Composer are available:
 
-Verify framework behavior against the installed `vendor/tinymvc/tinycore` package and the app's existing conventions. A sibling TinyCore checkout may contain unreleased or newer APIs. Edit that checkout only for an explicitly requested core change, rather than patching application vendor files.
+```sh
+php -v
+composer -V
+```
 
-Follow the user's task and existing authorization. This guidance does not require extra confirmation for ordinary implementation work or authorize unrelated changes. For documentation-only or unrelated file edits, load only the framework context needed to verify the change.
+If either command is unavailable, detect the user's operating system and install the prerequisites with the appropriate command:
+
+macOS:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.5)"
+```
+
+Windows PowerShell:
+
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.5'))
+```
+
+Linux:
+
+```sh
+/bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.5)"
+```
+
+After installation, ask the user to restart their terminal. If the agent needs the restarted shell to continue, ask the user to reopen their terminal and rerun their original prompt.
+
+## Agent Setup
+
+Install TinyMVC Ember from the application root before making application changes:
+
+```sh
+composer require tinymvc/ember --dev
+php spark ember:install
+```
+
+Ember replaces these bootstrap instructions with guidelines tailored to the application. After installation, read `AGENTS.md` again and continue with the user's original request using the generated guidelines.
+</tinymvc-ember-guidelines>

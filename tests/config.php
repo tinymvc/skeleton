@@ -9,6 +9,7 @@ if (!$storage) {
 return [
     'app' => [
         'debug' => false,
+        'env' => 'testing',
         'key' => '70e313f57a932c7388cae00b80a11912',
         'timezone' => 'UTC',
         'url' => 'http://localhost:8080',
