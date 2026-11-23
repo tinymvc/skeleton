@@ -31,22 +31,25 @@
         "ext-redis": "Required for Redis cache, lock, session, and queue drivers."
     },
     "scripts": {
-        "post-autoload-dump": [
-            "@php spark package:discover"
-        ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
+        "post-autoload-dump": [
+            "@php spark package:discover --ansi"
+        ],
+         "post-update-cmd": [
+            "@php spark vendor:publish --tag=spark-assets --ansi --force"
+        ],
         "post-create-project-cmd": [
-            "@php spark key:generate",
-            "@php spark migrate --seed"
+            "@php spark key:generate --ansi",
+            "@php spark migrate --ansi"
         ],
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php spark key:generate",
-            "@php spark migrate --seed",
-            "npm install",
+            "@php spark migrate --force",
+            "npm install  --ignore-scripts",
             "npm run build"
         ],
         "test": "@php test"
