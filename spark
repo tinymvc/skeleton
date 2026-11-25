@@ -17,6 +17,4 @@ $app->withCommands(
     load: __DIR__ . '/routes/console.php'
 );
 
-$app->handleCommand(); // Run the application
-
-exit;
+exit($app->handleCommand());
